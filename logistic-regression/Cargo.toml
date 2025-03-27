@@ -1,0 +1,10 @@
+[package]
+name = "logistic-regression"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+derive = "1.0.0"
+ndarray = "0.16.1"
+polars = { version = "0.46.0", features = ["csv", "lazy", "dtype-full", "random", "ndarray"] }
+rand = "0.9.0"
