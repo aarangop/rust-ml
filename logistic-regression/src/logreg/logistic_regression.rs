@@ -1,5 +1,5 @@
 use ndarray::{Array1, Array2};
-use rand::{Rng, thread_rng};
+use rand::Rng;
 
 
 pub struct Model {

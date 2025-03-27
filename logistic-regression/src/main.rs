@@ -1,5 +1,5 @@
 use logreg::logistic_regression::Model;
-use ndarray::{Array1, Array2, Ix1, Ix2};
+use ndarray::{Array1, Array2, Ix2};
 use polars::prelude::*;
 use std::path::Path;
 use rand::{rng, seq::SliceRandom};
