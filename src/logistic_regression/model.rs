@@ -13,7 +13,7 @@ impl Model {
     // Initialize weights as random values between 0 and 0.1
     let mut rng = rand::rng();
     let weights = Array1::<f64>::from_iter((0..n_x)
-      .map(|_| rng.random::<f64>() * 0.1));
+      .map(|_| rng.random::<f64>() * 0.01));
     Model {
       weights,
       bias: 0.0,
@@ -44,7 +44,7 @@ impl Model {
       self.bias = self.bias - learning_rate * db;
       let cost = self.compute_cost(&x, &y);
       if i % 100 == 0 {
-        println!("{}. Epoch - cost: {:.4}", i, cost);
+        println!("{}.\tEpoch - cost:\t{:.4}", i, cost);
       }
     } 
   }
@@ -78,7 +78,7 @@ impl Model {
     })
   }
 
-  ///
+  /// 
   pub fn accuracy(&self, x_test: Array2<f64>, y_test: Array1<f64>) -> f64 {
     assert_eq!(x_test.shape()[0], self.weights.len(), "Input features do not match model weights. Expected {} features, got {}", self.weights.shape()[0], x_test.shape()[0]);
     assert_eq!(y_test.shape()[0], x_test.shape()[1], "Target shape doesn't match input shape, expected {} got {}", x_test.shape()[1], y_test.shape()[0]);
@@ -93,5 +93,11 @@ impl Model {
       .zip(y_test.iter()).filter(|(a, b)| a == b)
       .count() as f64;
     correct/m
+  }
+
+  pub fn predict(&self, x: Array2<f64>) -> Array1<f64> {
+    assert_eq!(x.shape()[0], self.weights.len(), "Input features do not match model weights. Expected {} features, got {}", self.weights.shape()[0], x.shape()[0]);
+    let y_hat = self.forward_propagation(&x);
+    y_hat.map(|&x| if x > 0.5 {1.0} else {0.0})
   }
 }

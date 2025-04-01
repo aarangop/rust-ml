@@ -1,0 +1,33 @@
+.
+├── Cargo.lock
+├── Cargo.toml
+├── README.md
+├── datasets
+│   └── diabetes-dataset.csv
+├── rust-data-analysis
+│   ├── 1-iris-data-analysis-rust.ipynb
+│   ├── 2-ndarray-tutorial.ipynb
+│   ├── 3-polars-tutorial-part-1.ipynb
+│   ├── 4-polars-tutorial-part-2.ipynb
+│   ├── 5-probability-theory-tutorial.ipynb
+│   ├── 6-plotters-tutorial-part-1.ipynb
+│   ├── 7-calculus-tutorial-part-1.ipynb
+│   ├── CONTRIBUTING.md
+│   ├── Cargo.lock
+│   ├── Cargo.toml
+│   ├── LICENSE
+│   ├── README.md
+│   ├── dataset
+│   │   └── Iris.csv
+│   └── src
+│       └── main.rs
+├── src
+│   ├── logistic_regression.rs
+│   ├── logreg
+│   │   ├── logistic_regression.rs
+│   │   ├── mod.rs
+│   │   └── model.rs
+│   └── main.rs
+└── structure.txt
+
+7 directories, 24 files

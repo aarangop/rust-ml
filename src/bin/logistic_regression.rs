@@ -1,9 +1,9 @@
-use logreg::logistic_regression::Model;
+
+use rust_ml::logistic_regression::model::Model;
 use ndarray::{Array1, Array2, Ix2};
 use polars::prelude::*;
 use std::path::Path;
 use rand::{rng, seq::SliceRandom};
-pub mod logreg;
 
 fn read_dataset_from_csv(path: &Path) -> PolarsResult<DataFrame> {
     CsvReadOptions::default()
@@ -13,7 +13,7 @@ fn read_dataset_from_csv(path: &Path) -> PolarsResult<DataFrame> {
 }
 
 fn main() -> Result<(), PolarsError> {
-    let path = Path::new("diabetes-dataset.csv");
+    let path = Path::new("./datasets/diabetes-dataset.csv");
     let df = read_dataset_from_csv(path).unwrap();
     println!("Read with shape: {:?}", df.shape());
 
@@ -28,8 +28,9 @@ fn main() -> Result<(), PolarsError> {
     let idx = Series::new("idx".into(), indices);
 
     // Take rows in shuffled order
-    let shuffled_df = df.take(idx.u32().unwrap()).unwrap();
+    let shuffled_df = df.take(idx.u32()?)?;
 
+    // Split dataset into train and test sets.
     let split_point = (shuffled_df.height() as f64 * 0.8) as usize;
     let train_df = shuffled_df.slice(0, split_point);
     let test_df = shuffled_df
@@ -49,19 +50,19 @@ fn main() -> Result<(), PolarsError> {
         .into_dimensionality::<Ix2>().unwrap()
         .t()
         .to_owned();
+    let test_features_array: Array2<f64> = test_features_df
+        .to_ndarray::<Float64Type>(IndexOrder::Fortran)?
+        .into_dimensionality::<Ix2>().unwrap()
+        .t()
+        .to_owned();
 
+    // Convert targets into 1D array (m x 1)
     let train_target_array: Array1<f64> = train_target_df
         .cast(&DataType::Float64)?
         .f64()?
         .into_iter()
         .filter_map(|x| x)
         .collect::<Array1<f64>>();
-
-    let test_features_array: Array2<f64> = test_features_df
-        .to_ndarray::<Float64Type>(IndexOrder::Fortran)?
-        .into_dimensionality::<Ix2>().unwrap()
-        .t()
-        .to_owned();
     let test_target_array: Array1<f64> = test_target_df
         .cast(&DataType::Float64)?
         .f64()?
@@ -79,7 +80,7 @@ fn main() -> Result<(), PolarsError> {
     let mut model = Model::new(n_features);
 
     // Train the model
-    model.train(train_features_array, train_target_array, 0.05, 10000);
+    model.train(train_features_array, train_target_array, 0.03, 10000);
 
     // Test the model
     let accuracy = model.accuracy(test_features_array, test_target_array);

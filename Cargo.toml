@@ -1,0 +1,24 @@
+[package]
+name = "rust-ml"
+version = "0.1.0"
+edition = "2024"
+
+# Library definition - crucial for binary files to import
+[lib]
+name = "rust_ml"
+path = "src/lib.rs"
+
+# Define the main binary
+[[bin]]
+name = "rust-ml"
+path = "src/main.rs"
+
+# Define model-specific binaries
+[[bin]]
+name = "logistic-regression"
+path = "src/bin/logistic_regression.rs"
+
+[dependencies]
+ndarray = "0.16.1"
+polars = { version = "0.46.0", features = ["csv", "dtype-full", "lazy", "ndarray"] }
+rand = "0.9.0"

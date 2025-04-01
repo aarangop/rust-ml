@@ -1,0 +1,138 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'rust_ml'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "rust_ml",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'linear_regression'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=linear_regression",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "linear_regression",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'linear_regression'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=linear_regression",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "linear_regression",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'logistic-regression'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=logistic-regression",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "logistic-regression",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'logistic-regression'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=logistic-regression",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "logistic-regression",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'rust-ml'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=rust-ml",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "rust-ml",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'rust-ml'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=rust-ml",
+          "--package=rust-ml"
+        ],
+        "filter": {
+          "name": "rust-ml",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
