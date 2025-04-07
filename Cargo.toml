@@ -14,11 +14,22 @@ name = "rust-ml"
 path = "src/main.rs"
 
 # Define model-specific binaries
+#[[bin]]
+#name = "logistic-regression"
+#path = "src/bin/logistic_regression.rs"
+#
+#[[bin]]
+#name = "single-layer-classifier"
+#path = "src/bin/single_layer_classifier.rs"
+
 [[bin]]
-name = "logistic-regression"
-path = "src/bin/logistic_regression.rs"
+name = "linear-regression"
+path = "src/bin/linear_regression.rs"
 
 [dependencies]
+approx = "0.5.1"
 ndarray = "0.16.1"
+ndarray-rand = "0.15.0"
 polars = { version = "0.46.0", features = ["csv", "dtype-full", "lazy", "ndarray"] }
 rand = "0.9.0"
+thiserror = "2.0.12"

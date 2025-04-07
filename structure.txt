@@ -1,0 +1,61 @@
+.
+├── Cargo.lock
+├── Cargo.toml
+├── README.md
+├── datasets
+│   ├── advertising.csv
+│   ├── catvnoncat
+│   │   ├── test_catvnoncat.h5
+│   │   └── train_catvnoncat.h5
+│   └── diabetes-dataset.csv
+├── notebooks
+│   ├── linear_regression.ipynb
+│   ├── logistic_regression.ipynb
+│   └── single_layer_classifier.ipynb
+├── requirements.txt
+├── rust-data-analysis
+│   ├── 1-iris-data-analysis-rust.ipynb
+│   ├── 2-ndarray-tutorial.ipynb
+│   ├── 3-polars-tutorial-part-1.ipynb
+│   ├── 4-polars-tutorial-part-2.ipynb
+│   ├── 5-probability-theory-tutorial.ipynb
+│   ├── 6-plotters-tutorial-part-1.ipynb
+│   ├── 7-calculus-tutorial-part-1.ipynb
+│   ├── CONTRIBUTING.md
+│   ├── Cargo.lock
+│   ├── Cargo.toml
+│   ├── LICENSE
+│   ├── README.md
+│   ├── dataset
+│   │   └── Iris.csv
+│   └── src
+│       └── main.rs
+├── src
+│   ├── bin
+│   │   ├── linear_regression.rs
+│   │   ├── logistic_regression.rs
+│   │   └── single_layer_classifier.rs
+│   ├── builders
+│   │   ├── base.rs
+│   │   ├── mod.rs
+│   │   └── single_hidden_layer_classifier.rs
+│   ├── lib.rs
+│   ├── logistic_regression
+│   │   └── mod.rs
+│   ├── main.rs
+│   ├── model
+│   │   ├── base.rs
+│   │   ├── error.rs
+│   │   ├── linear_regression.rs
+│   │   ├── logistic_regression.rs
+│   │   ├── mod.rs
+│   │   ├── single_hidden_layer_classifier.rs
+│   │   └── utils.rs
+│   └── optimizers
+│       ├── gradient_descent.rs
+│       ├── mod.rs
+│       ├── optimizer.rs
+│       └── single_hidden_layer_optimizer.rs
+└── structure.txt
+
+13 directories, 46 files

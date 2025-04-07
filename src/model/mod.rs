@@ -1,2 +1,2 @@
-pub mod base;
-pub mod error;
+pub mod ml_model;
+pub mod linear_regression;
