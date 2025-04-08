@@ -6,7 +6,7 @@ use rust_ml::model::linear_regression::LinearRegression;
 use rust_ml::optimization::gradient_descent::GradientDescent;
 
 fn main() {
-    let mut model = LinearRegression::builder()
+    let mut model = LinearRegression::builder(/* &LinearRegression */)
         .n_input_features(3)
         .build()
         .unwrap();

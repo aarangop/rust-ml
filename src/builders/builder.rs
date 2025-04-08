@@ -1,9 +1,9 @@
 use crate::core::error::ModelError;
-use crate::model::core::optimizable_model::OptimizableModel;
+use crate::model::core::base::BaseModel;
 
 pub trait Builder<M, Input, Output>
 where
-    M: OptimizableModel<Input, Output>,
+    M: BaseModel<Input, Output>,
 {
     fn build(&self) -> Result<M, ModelError>;
 }

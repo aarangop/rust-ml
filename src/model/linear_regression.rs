@@ -2,44 +2,75 @@ use crate::bench::regression_metrics::RegressionMetrics;
 use crate::builders::linear_regression::LinearRegressionBuilder;
 use crate::core::error::ModelError;
 use crate::core::param_manager::ParamManager;
-use crate::core::param_storage::ParameterStorage;
 use crate::core::types::{Matrix, ModelParams, Vector};
 use crate::model::core::base::{BackwardPropagation, BaseModel, ForwardPropagation};
 use crate::model::core::optimizable_model::OptimizableModel;
 use crate::model::core::regression_model::RegressionModel;
 use ndarray::{Array1, Array2, ArrayView, Ix1, IxDyn};
-use ndarray_rand::rand_distr::num_traits::real::Real;
 
 /// A Linear Regression model that fits the equation y = Wx + b
 ///
 /// This model predicts a continuous value output based on input features
 /// using a linear relationship where W is the weight vector and b is the bias.
+/// Linear regression is one of the most fundamental machine learning algorithms
+/// used for predicting numerical values by establishing a linear relationship
+/// between the independent variables (features) and the dependent variable (target).
+///
+/// The model minimizes the Mean Squared Error (MSE) between predictions and actual values.
 #[derive(Debug)]
 pub struct LinearRegression {
-    /// The weights vector for the linear model
-    weights: Array1<f64>,
-    /// The bias term for the linear model
-    bias: Array1<f64>,
+    /// The weights vector (W) for the linear model representing the coefficients
+    /// for each feature in the input data
+    weights: Vector,
+    /// The bias term (b) for the linear model representing the y-intercept
+    /// of the linear equation
+    bias: Vector,
 }
 
 impl LinearRegression {
     /// Creates a new LinearRegression model with zero-initialized weights and bias
     ///
+    /// Initializes a linear regression model with all weights set to zero and bias
+    /// set to zero. This creates an untrained model that can be later optimized
+    /// using various training algorithms.
+    ///
     /// # Arguments
-    /// * `n_x` - Number of input features
+    /// * `n_x` - Number of input features in the dataset
     ///
     /// # Returns
     /// * `Result<Self, ModelError>` - A new LinearRegression instance or an error
+    /// if the initialization fails
+    ///
+    /// # Example
+    /// ```
+    /// use rust_ml::model::linear_regression::LinearRegression;
+    ///
+    /// // Create a linear regression model with 3 input features
+    /// let model = LinearRegression::new(3).unwrap();
+    /// ```
     pub fn new(n_x: usize) -> Result<Self, ModelError> {
         let weights = Array1::<f64>::zeros(n_x);
         let bias = Array1::<f64>::from_elem(1, 0.0);
         Ok(Self { weights, bias })
     }
-
     /// Returns a builder for creating a LinearRegression with custom configuration
     ///
+    /// The builder pattern allows for more flexible initialization of the model
+    /// with various optional parameters and configurations.
+    ///
     /// # Returns
-    /// * `LinearRegressionBuilder` - A builder for LinearRegression
+    /// * `LinearRegressionBuilder` - A builder for LinearRegression with fluent API
+    ///
+    /// # Example
+    /// ```
+    /// use rust_ml::model::linear_regression::LinearRegression;
+    ///
+    /// // Create a model using the builder
+    /// let model = LinearRegression::builder()
+    ///     .with_feature_count(4)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
     pub fn builder() -> LinearRegressionBuilder {
         LinearRegressionBuilder::new()
     }
@@ -47,6 +78,9 @@ impl LinearRegression {
 
 impl ParamManager for LinearRegression {
     /// Gets all model parameters
+    ///
+    /// Retrieves all trainable parameters (weights and bias) from the model
+    /// as a key-value store where keys are "W" for weights and "b" for bias.
     ///
     /// # Returns
     /// * `ModelParams` - HashMap containing the model parameters
@@ -59,8 +93,12 @@ impl ParamManager for LinearRegression {
 
     /// Updates the model parameters
     ///
+    /// Sets the model parameters (weights and bias) based on the provided values.
+    /// This is typically used during model optimization/training to update the
+    /// parameters based on calculated gradients.
+    ///
     /// # Arguments
-    /// * `params` - HashMap containing the parameters to update
+    /// * `params` - HashMap containing the parameters to update with keys "W" and "b"
     fn update_params(&mut self, params: ModelParams) {
         if params.contains_key("W") {
             let weights = params
@@ -83,11 +121,14 @@ impl ParamManager for LinearRegression {
 
     /// Gets a specific model parameter by key
     ///
+    /// Retrieves a specific parameter from the model based on its key identifier.
+    ///
     /// # Arguments
     /// * `key` - The key of the parameter to retrieve ("W" for weights, "b" for bias)
     ///
     /// # Returns
     /// * `Result<ArrayView<f64, IxDyn>, ModelError>` - The parameter value or an error
+    /// if the key is invalid
     fn get_param(&self, key: &str) -> Result<ArrayView<f64, IxDyn>, ModelError> {
         match key {
             "W" => Ok(self.weights.view().into_dyn()),
@@ -97,16 +138,27 @@ impl ParamManager for LinearRegression {
     }
 }
 
-impl OptimizableModel<Array2<f64>, Array1<f64>> for LinearRegression {}
+impl OptimizableModel<Matrix, Vector> for LinearRegression {}
 
 impl ForwardPropagation<Matrix, Vector> for LinearRegression {
     /// Computes the forward pass of linear regression: y = Wx + b
     ///
+    /// Performs the forward computation step for linear regression by calculating
+    /// the linear combination of inputs and weights, then adding the bias term.
+    /// The formula is: y_hat = W^T * x + b
+    ///
     /// # Arguments
-    /// * `x` - Input features of shape (n_x, m) where n_x is the number of features and m is the batch size
+    /// * `x` - Input features of shape (n_x, m) where n_x is the number of features
+    ///         and m is the number of examples/batch size
     ///
     /// # Returns
-    /// * `Result<(DefOutput, Option<ModelParams>), ModelError>` - The predicted values and optional cache
+    /// * `Result<(Vector, Option<ModelParams>), ModelError>` - Tuple containing:
+    ///   - The predicted values (y_hat)
+    ///   - Option<ModelParams>: None for LinearRegression (no cache needed)
+    ///
+    /// # Errors
+    /// Returns a ModelError if the dimensions of the input are incompatible with
+    /// the model's weights.
     fn compute_forward_propagation(
         &self,
         x: &Matrix,
@@ -135,14 +187,19 @@ impl ForwardPropagation<Matrix, Vector> for LinearRegression {
 impl BackwardPropagation<Array2<f64>, Array1<f64>> for LinearRegression {
     /// Computes the backward pass to get gradients for linear regression
     ///
+    /// Calculates the gradients of the cost function with respect to the weights and bias.
+    /// For linear regression with MSE loss, the gradients are:
+    /// - dW = (1/m) * X * (y_hat - y)^T
+    /// - db = (1/m) * sum(y_hat - y)
+    ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
     /// * `y` - Target values of shape (m,)
-    /// * `output_gradient` - Gradient from the output layer
-    /// * `cache` - Optional cached values from forward pass
+    /// * `output_gradient` - Gradient from the output layer (typically y_hat - y)
+    /// * `cache` - Optional cached values from forward pass (not used in LinearRegression)
     ///
     /// # Returns
-    /// * `Result<ModelParams, ModelError>` - HashMap containing the gradients for weights and bias
+    /// * `Result<ModelParams, ModelError>` - HashMap containing gradients "dW" and "db"
     fn compute_backward_propagation(
         &self,
         x: &Array2<f64>,
@@ -170,11 +227,13 @@ impl BackwardPropagation<Array2<f64>, Array1<f64>> for LinearRegression {
 impl BaseModel<Matrix, Vector> for LinearRegression {
     /// Predicts output values for given input features
     ///
+    /// Applies the linear regression model to make predictions on new data.
+    ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
     ///
     /// # Returns
-    /// * `Result<DefOutput, ModelError>` - Predicted values
+    /// * `Result<Vector, ModelError>` - Predicted values of shape (m,)
     fn predict(&self, x: &Matrix) -> Result<Vector, ModelError> {
         let (y_hat, _) = self.compute_forward_propagation(x)?;
         Ok(y_hat)
@@ -182,11 +241,12 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
 
     /// Computes the Mean Squared Error cost between predictions and target values
     ///
-    /// The cost function used is: J = (1/2m) * Σ(y_hat - y)²
+    /// Calculates the cost using the formula: J = (1/2m) * Σ(y_hat - y)²
+    /// where m is the number of examples
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,1)
+    /// * `y` - Target values of shape (m,)
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The computed cost value
@@ -198,14 +258,15 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
 
     /// Computes the gradient of the cost with respect to the output predictions
     ///
-    /// For linear regression the gradient dJ/dy_hat is: (1/m) * (y_hat - y)
+    /// For Mean Squared Error, the gradient dJ/dy_hat is: (1/m) * (y_hat - y)
+    /// where m is the number of examples
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
     /// * `y` - Target values of shape (m,)
     ///
     /// # Returns
-    /// * `Result<DefOutput, ModelError>` - The gradient of the cost function
+    /// * `Result<Vector, ModelError>` - The gradient of the cost function
     fn compute_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         let (y_hat, _) = self.compute_forward_propagation(x)?;
         let m = x.len() as f64;
@@ -217,12 +278,28 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
 }
 
 impl RegressionModel<Matrix, Vector> for LinearRegression {
+    /// Calculates the Mean Squared Error between predictions and target values
+    ///
+    /// # Arguments
+    /// * `x` - Input features of shape (n_x, m)
+    /// * `y` - Target values of shape (m,)
+    ///
+    /// # Returns
+    /// * `Result<f64, ModelError>` - The MSE value
     fn mse(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let m = x.len() as f64;
         Ok((&y_hat - y).mapv(|v| v.powi(2)).sum() / m)
     }
 
+    /// Calculates the Root Mean Squared Error between predictions and target values
+    ///
+    /// # Arguments
+    /// * `x` - Input features of shape (n_x, m)
+    /// * `y` - Target values of shape (m,)
+    ///
+    /// # Returns
+    /// * `Result<f64, ModelError>` - The RMSE value (square root of MSE)
     fn rmse(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let m = x.len() as f64;
@@ -230,6 +307,18 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
         Ok(rmse)
     }
 
+    /// Calculates the R-squared (coefficient of determination) for the model
+    ///
+    /// R² represents the proportion of variance in the dependent variable
+    /// that is predictable from the independent variables.
+    /// R² = 1 - (MSE / Variance of y)
+    ///
+    /// # Arguments
+    /// * `x` - Input features of shape (n_x, m)
+    /// * `y` - Target values of shape (m,)
+    ///
+    /// # Returns
+    /// * `Result<f64, ModelError>` - The R² value between 0 and 1
     fn r2(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let numerator = self.mse(x, y)?;
@@ -237,6 +326,14 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
         Ok(1.0 - numerator / denominator)
     }
 
+    /// Computes a complete set of regression metrics for model evaluation
+    ///
+    /// # Arguments
+    /// * `x` - Input features of shape (n_x, m)
+    /// * `y` - Target values of shape (m,)
+    ///
+    /// # Returns
+    /// * `Result<RegressionMetrics, ModelError>` - Struct containing MSE, RMSE, and R²
     fn compute_metrics(&self, x: &Matrix, y: &Vector) -> Result<RegressionMetrics, ModelError> {
         let mse = self.mse(x, y)?;
         let rmse = self.rmse(x, y)?;
@@ -244,6 +341,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
         Ok(RegressionMetrics { mse, rmse, r2 })
     }
 }
+
 #[cfg(test)]
 mod forward_propagation_tests {
     use super::*;

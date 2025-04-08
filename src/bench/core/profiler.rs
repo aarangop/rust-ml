@@ -1,7 +1,7 @@
 use crate::bench::core::error::ProfilerError;
+use crate::bench::core::train_metrics::TrainMetrics;
 
 pub trait Profiler<Model, Opt, Input, Output> {
-    type TrainMetrics;
     type EvalMetrics;
 
     fn profile_training(
@@ -10,7 +10,7 @@ pub trait Profiler<Model, Opt, Input, Output> {
         optimizer: &mut Opt,
         x: &Input,
         y: &Output,
-    ) -> Result<(Self::TrainMetrics, Self::EvalMetrics), ProfilerError>;
+    ) -> Result<(TrainMetrics, Self::EvalMetrics), ProfilerError>;
 
     fn profile_evaluation(
         &self,
