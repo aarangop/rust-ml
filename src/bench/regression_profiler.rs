@@ -1,7 +1,7 @@
-use crate::bench::error::ProfilerError;
-use crate::bench::profiler::Profiler;
+use crate::bench::core::error::ProfilerError;
+use crate::bench::core::profiler::Profiler;
+use crate::bench::core::train_metrics::TrainMetrics;
 use crate::bench::regression_metrics::RegressionMetrics;
-use crate::bench::train_metrics::TrainMetrics;
 use crate::model::core::optimizable_model::OptimizableModel;
 use crate::model::core::regression_model::RegressionModel;
 use crate::optimization::core::optimizer::Optimizer;

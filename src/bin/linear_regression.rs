@@ -1,5 +1,5 @@
 use ndarray::{arr1, arr2, Array1, Array2};
-use rust_ml::bench::profiler::Profiler;
+use rust_ml::bench::core::profiler::Profiler;
 use rust_ml::bench::regression_profiler::RegressionProfiler;
 use rust_ml::builders::builder::Builder;
 use rust_ml::model::linear_regression::LinearRegression;

@@ -1,4 +1,4 @@
-use crate::bench::error::ProfilerError;
+use crate::bench::core::error::ProfilerError;
 
 pub trait Profiler<Model, Opt, Input, Output> {
     type TrainMetrics;
