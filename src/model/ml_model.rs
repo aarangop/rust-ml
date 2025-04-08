@@ -67,3 +67,25 @@ pub trait OptimizableModel<Input, Output>:
     + ParamManager
 {
 }
+
+pub trait ClassificationModel<Input, Output> {
+    fn accuracy(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn loss(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn recall(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn f1_score(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn compute_metrics(&self, x: &Input, y: &Output) -> Result<ModelParams, ModelError>;
+}
+
+pub trait RegressionModel<Input, Output> {
+    fn mse(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn rmse(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn r2(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn compute_metrics(&self, x: &Input, y: &Output) -> Result<RegressionMetrics, ModelError>;
+}
+
+#[derive(Debug)]
+pub struct RegressionMetrics {
+    pub mse: f64,
+    pub rmse: f64,
+    pub r2: f64,
+}

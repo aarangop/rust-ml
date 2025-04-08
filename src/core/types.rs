@@ -39,5 +39,5 @@ use std::collections::HashMap;
 /// This convention makes it easy to match parameters with their corresponding
 /// gradients during optimization steps (e.g., `W1` pairs with `dW1`).
 pub type ModelParams = HashMap<String, Array<f64, IxDyn>>;
-pub type DefInput = Array2<f64>;
-pub type DefOutput = Array1<f64>;
+pub type Matrix = Array2<f64>;
+pub type Vector = Array1<f64>;

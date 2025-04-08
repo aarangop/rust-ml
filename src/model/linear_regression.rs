@@ -1,12 +1,17 @@
 use crate::builders::linear_regression::LinearRegressionBuilder;
 use crate::core::error::ModelError;
 use crate::core::param_manager::ParamManager;
-use crate::core::types::{DefInput, DefOutput, ModelParams};
-use crate::model::ml_model::{BackwardPropagation, ForwardPropagation, MLModel, OptimizableModel};
-use ndarray::{array, Array1, Array2, ArrayView, Dimension, Ix1, IxDyn};
+use crate::core::param_storage::ParameterStorage;
+use crate::core::types::{Matrix, ModelParams, Vector};
+use crate::model::ml_model::{
+    BackwardPropagation, ForwardPropagation, MLModel, OptimizableModel, RegressionMetrics,
+    RegressionModel,
+};
+use ndarray::{Array1, Array2, ArrayView, Ix1, IxDyn};
+use ndarray_rand::rand_distr::num_traits::real::Real;
 
 /// A Linear Regression model that fits the equation y = Wx + b
-/// 
+///
 /// This model predicts a continuous value output based on input features
 /// using a linear relationship where W is the weight vector and b is the bias.
 #[derive(Debug)]
@@ -94,7 +99,7 @@ impl ParamManager for LinearRegression {
 
 impl OptimizableModel<Array2<f64>, Array1<f64>> for LinearRegression {}
 
-impl ForwardPropagation<DefInput, DefOutput> for LinearRegression {
+impl ForwardPropagation<Matrix, Vector> for LinearRegression {
     /// Computes the forward pass of linear regression: y = Wx + b
     ///
     /// # Arguments
@@ -104,8 +109,8 @@ impl ForwardPropagation<DefInput, DefOutput> for LinearRegression {
     /// * `Result<(DefOutput, Option<ModelParams>), ModelError>` - The predicted values and optional cache
     fn compute_forward_propagation(
         &self,
-        x: &DefInput,
-    ) -> Result<(DefOutput, Option<ModelParams>), ModelError> {
+        x: &Matrix,
+    ) -> Result<(Vector, Option<ModelParams>), ModelError> {
         // Check that dimensions are compatible.
         if x.shape()[0] != self.weights.shape()[0] {
             return Err(ModelError::Dimensions {
@@ -142,7 +147,7 @@ impl BackwardPropagation<Array2<f64>, Array1<f64>> for LinearRegression {
         &self,
         x: &Array2<f64>,
         y: &Array1<f64>,
-        output_gradient: &DefOutput,
+        output_gradient: &Vector,
         cache: Option<ModelParams>,
     ) -> Result<ModelParams, ModelError> {
         // Get size of training set
@@ -162,7 +167,7 @@ impl BackwardPropagation<Array2<f64>, Array1<f64>> for LinearRegression {
     }
 }
 
-impl MLModel<DefInput, DefOutput> for LinearRegression {
+impl MLModel<Matrix, Vector> for LinearRegression {
     /// Predicts output values for given input features
     ///
     /// # Arguments
@@ -170,7 +175,7 @@ impl MLModel<DefInput, DefOutput> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<DefOutput, ModelError>` - Predicted values
-    fn predict(&self, x: &DefInput) -> Result<DefOutput, ModelError> {
+    fn predict(&self, x: &Matrix) -> Result<Vector, ModelError> {
         let (y_hat, _) = self.compute_forward_propagation(x)?;
         Ok(y_hat)
     }
@@ -181,11 +186,11 @@ impl MLModel<DefInput, DefOutput> for LinearRegression {
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
+    /// * `y` - Target values of shape (m,1)
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The computed cost value
-    fn compute_cost(&self, x: &DefInput, y: &DefOutput) -> Result<f64, ModelError> {
+    fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let (y_hat, _) = self.compute_forward_propagation(x)?;
         let m = x.len() as f64;
         Ok((&y_hat - y).mapv(|v| v.powi(2)).sum() / (2.0 * m))
@@ -201,7 +206,7 @@ impl MLModel<DefInput, DefOutput> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<DefOutput, ModelError>` - The gradient of the cost function
-    fn compute_gradient(&self, x: &DefInput, y: &DefOutput) -> Result<DefOutput, ModelError> {
+    fn compute_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         let (y_hat, _) = self.compute_forward_propagation(x)?;
         let m = x.len() as f64;
         let dy = (y_hat - y).sum() / m;
@@ -210,10 +215,40 @@ impl MLModel<DefInput, DefOutput> for LinearRegression {
         Ok(Array1::from_elem(y.len(), dy))
     }
 }
+
+impl RegressionModel<Matrix, Vector> for LinearRegression {
+    fn mse(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+        let y_hat = self.predict(x)?;
+        let m = x.len() as f64;
+        Ok((&y_hat - y).mapv(|v| v.powi(2)).sum() / m)
+    }
+
+    fn rmse(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+        let y_hat = self.predict(x)?;
+        let m = x.len() as f64;
+        let rmse = ((&y_hat - y).mapv(|v| v.powi(2)).sum() / m).sqrt();
+        Ok(rmse)
+    }
+
+    fn r2(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+        let y_hat = self.predict(x)?;
+        let numerator = self.mse(x, y)?;
+        let denominator = (y_hat - y.mean().unwrap()).powi(2).sum();
+        Ok(1.0 - numerator / denominator)
+    }
+
+    fn compute_metrics(&self, x: &Matrix, y: &Vector) -> Result<RegressionMetrics, ModelError> {
+        let mse = self.mse(x, y)?;
+        let rmse = self.rmse(x, y)?;
+        let r2 = self.r2(x, y)?;
+        Ok(RegressionMetrics { mse, rmse, r2 })
+    }
+}
 #[cfg(test)]
 mod forward_propagation_tests {
     use super::*;
     use approx::assert_abs_diff_eq;
+    use ndarray::array;
 
     #[test]
     fn test_compute_forward_propagation_single_feature() {
@@ -342,6 +377,8 @@ mod backward_propagation_tests {
 mod linear_regression_tests {
     use super::*;
     use approx::assert_abs_diff_eq;
+    use ndarray::array;
+
     #[test]
     fn test_predict() {
         let mut lr = LinearRegression::new(2).unwrap();

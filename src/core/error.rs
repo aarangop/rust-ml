@@ -19,4 +19,7 @@ pub enum ModelError {
 
     #[error("Convergence failed: {0}")]
     Convergence(String),
+
+    #[error("Dimensionality error: {0}")]
+    DimensionalityError(String),
 }

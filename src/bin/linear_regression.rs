@@ -1,8 +1,9 @@
-use ndarray::{arr1, arr2};
+use ndarray::{arr1, arr2, Array1, Array2};
+use rust_ml::bench::profiler::Profiler;
+use rust_ml::bench::regression_profiler::RegressionProfiler;
 use rust_ml::builders::builder::Builder;
 use rust_ml::model::linear_regression::LinearRegression;
 use rust_ml::optimization::gradient_descent::GradientDescent;
-use rust_ml::optimization::optimizer::Optimizer;
 
 fn main() {
     let mut model = LinearRegression::builder()
@@ -10,27 +11,18 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut gd = GradientDescent::new(0.01, 1000);
+    let mut gd = GradientDescent::new(0.01, 10000);
 
     let x = arr2(&[[1., 2., 3.], [1., 5., 9.], [1., 8., 7.]]);
-    let y = arr1(&[5., 6., 7.]);
+    let y = arr1(&[6., 75., 57.]);
 
-    println!("x.shape: {:?}", x.shape());
-    println!("y.shape: {:?}", y.shape());
-    println!("x: \n{:?}", x);
-    println!("y: \n{:?}", y);
+    let profiler: RegressionProfiler<LinearRegression, GradientDescent, Array2<f64>, Array1<f64>> =
+        RegressionProfiler::new();
 
-    let cost = model.compute_cost(&x, &y).unwrap();
+    let (train_metrics, eval_metrics) = profiler
+        .profile_training(&mut model, &mut gd, &x, &y)
+        .unwrap();
 
-    println!("untrained cost: \n{:?}", cost);
-
-    // Train the model
-    gd.fit(&mut *model, &x, &y).unwrap();
-
-    let cost = model.compute_cost(&x, &y).unwrap();
-    println!("trained cost: \n{:?}", cost);
-
-    let y_hat = model.predict(&x).unwrap();
-    println!("y_hat: \n{:?}", y_hat);
-    println!("y: \n{:?}", y);
+    println!("train metrics: \n{:?}", train_metrics);
+    println!("model metrics: \n{:?}", eval_metrics);
 }

@@ -1,8 +1,7 @@
 use crate::core::error::ModelError;
-use crate::core::types::ModelParams;
+use crate::core::types::{Matrix, ModelParams, Vector};
 use crate::model::ml_model::OptimizableModel;
 use crate::optimization::optimizer::Optimizer;
-use ndarray::{Array1, Array2};
 
 pub struct GradientDescent {
     learning_rate: f64,
@@ -20,14 +19,14 @@ impl GradientDescent {
     }
 }
 
-// Define type aliases at the module level
-type Input = Array2<f64>;
-type Output = Array1<f64>;
-type MLModelType = dyn OptimizableModel<Input, Output>;
-
-impl Optimizer<Input, Output, MLModelType> for GradientDescent {
-    fn fit(&mut self, model: &mut MLModelType, x: &Input, y: &Output) -> Result<(), ModelError> {
-        for i in 0..self.epochs {
+impl Optimizer<Matrix, Vector> for GradientDescent {
+    fn fit(
+        &mut self,
+        model: &mut dyn OptimizableModel<Matrix, Vector>,
+        x: &Matrix,
+        y: &Vector,
+    ) -> Result<(), ModelError> {
+        for _ in 0..self.epochs {
             // Get the gradient of the cost function in relation to the model predictions.
             let output_grad = model.compute_gradient(x, y)?;
             let (_, cache) = model.compute_forward_propagation(x)?;

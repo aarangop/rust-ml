@@ -1,17 +1,15 @@
 use crate::builders::builder::Builder;
 use crate::core::error::ModelError;
-use crate::core::types::{DefInput, DefOutput};
+use crate::core::types::{Matrix, Vector};
 use crate::model::linear_regression::LinearRegression;
-use crate::model::ml_model::OptimizableModel;
 
 pub struct LinearRegressionBuilder {
     n_x: usize,
 }
 
-impl Builder<DefInput, DefOutput> for LinearRegressionBuilder {
-    fn build(&self) -> Result<Box<dyn OptimizableModel<DefInput, DefOutput>>, ModelError> {
-        let model = LinearRegression::new(self.n_x)?;
-        Ok(Box::new(model))
+impl Builder<LinearRegression, Matrix, Vector> for LinearRegressionBuilder {
+    fn build(&self) -> Result<LinearRegression, ModelError> {
+        LinearRegression::new(self.n_x)
     }
 }
 
