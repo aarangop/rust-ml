@@ -1,2 +1,2 @@
-pub mod ml_model;
+pub mod core;
 pub mod linear_regression;

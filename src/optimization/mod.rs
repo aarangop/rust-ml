@@ -1,2 +1,2 @@
+pub mod core;
 pub mod gradient_descent;
-pub mod optimizer;

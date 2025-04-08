@@ -1,12 +1,12 @@
+use crate::bench::regression_metrics::RegressionMetrics;
 use crate::builders::linear_regression::LinearRegressionBuilder;
 use crate::core::error::ModelError;
 use crate::core::param_manager::ParamManager;
 use crate::core::param_storage::ParameterStorage;
 use crate::core::types::{Matrix, ModelParams, Vector};
-use crate::model::ml_model::{
-    BackwardPropagation, ForwardPropagation, MLModel, OptimizableModel, RegressionMetrics,
-    RegressionModel,
-};
+use crate::model::core::base::{BackwardPropagation, BaseModel, ForwardPropagation};
+use crate::model::core::optimizable_model::OptimizableModel;
+use crate::model::core::regression_model::RegressionModel;
 use ndarray::{Array1, Array2, ArrayView, Ix1, IxDyn};
 use ndarray_rand::rand_distr::num_traits::real::Real;
 
@@ -167,7 +167,7 @@ impl BackwardPropagation<Array2<f64>, Array1<f64>> for LinearRegression {
     }
 }
 
-impl MLModel<Matrix, Vector> for LinearRegression {
+impl BaseModel<Matrix, Vector> for LinearRegression {
     /// Predicts output values for given input features
     ///
     /// # Arguments

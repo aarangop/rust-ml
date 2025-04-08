@@ -1,5 +1,5 @@
 use crate::core::error::ModelError;
-use crate::model::ml_model::OptimizableModel;
+use crate::model::core::optimizable_model::OptimizableModel;
 
 pub trait Optimizer<Input, Output> {
     fn fit(

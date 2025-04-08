@@ -1,7 +1,7 @@
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, ModelParams, Vector};
-use crate::model::ml_model::OptimizableModel;
-use crate::optimization::optimizer::Optimizer;
+use crate::model::core::optimizable_model::OptimizableModel;
+use crate::optimization::core::optimizer::Optimizer;
 
 pub struct GradientDescent {
     learning_rate: f64,
