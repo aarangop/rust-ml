@@ -1,6 +1,6 @@
 [package]
 name = "rust-ml"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "A collection of machine learning algorithms implemented in pure Rust (personal project for practice)."
