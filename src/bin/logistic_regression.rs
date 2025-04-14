@@ -1,6 +1,3 @@
-use rust_ml::model::logistic_regression::LogisticRegression;
-use rust_ml::optim::sgd::GradientDescent;
-
 fn main() {
     // let mut model = LogisticRegression::builder()
     //     .n_features(3)

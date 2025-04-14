@@ -79,6 +79,17 @@ impl ParamCollection for LinearRegression {
         }
     }
 
+    fn get_mut<D: ndarray::Dimension>(
+        &mut self,
+        key: &str,
+    ) -> Result<ndarray::ArrayViewMut<f64, D>, ModelError> {
+        match key {
+            "weights" => Ok(self.w.view_mut().into_dimensionality::<D>().unwrap()),
+            "bias" => Ok(self.b.view_mut().into_dimensionality::<D>().unwrap()),
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
     fn set<D: ndarray::Dimension>(
         &mut self,
         key: &str,
@@ -104,17 +115,6 @@ impl ParamCollection for LinearRegression {
             ("weights", self.w.view().into_dyn()),
             ("bias", self.b.view().into_dyn()),
         ]
-    }
-
-    fn get_mut<D: ndarray::Dimension>(
-        &mut self,
-        key: &str,
-    ) -> Result<ndarray::ArrayViewMut<f64, D>, ModelError> {
-        match key {
-            "weights" => Ok(self.w.view_mut().into_dimensionality::<D>().unwrap()),
-            "bias" => Ok(self.b.view_mut().into_dimensionality::<D>().unwrap()),
-            _ => Err(ModelError::KeyError(key.to_string())),
-        }
     }
 }
 
@@ -191,7 +191,7 @@ impl DLModel<Matrix, Vector> for LinearRegression {
     fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
         let weights: ArrayView1<f64> = self.get("weights")?;
         let bias: ArrayView0<f64> = self.get("bias")?;
-        let y_hat = input.dot(&weights) + bias;
+        let y_hat = weights.t().dot(input) + bias;
         Ok(y_hat)
     }
 
