@@ -1,5 +1,6 @@
 use crate::bench::classification_metrics::ClassificationMetrics;
 use crate::core::error::ModelError;
+use crate::model::core::base::DLModel;
 
 /// A trait for models that perform classification tasks.
 ///
@@ -9,7 +10,7 @@ use crate::core::error::ModelError;
 /// # Type Parameters
 /// * `Input`: The type of input data the model accepts
 /// * `Output`: The type of output data against which predictions are compared
-pub trait ClassificationModel<Input, Output> {
+pub trait ClassificationModel<Input, Output>: DLModel<Input, Output> {
     /// Calculates the accuracy of the model on the given data.
     ///
     /// Accuracy is defined as the proportion of correct predictions among the total number of predictions.

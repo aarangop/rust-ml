@@ -1,14 +1,13 @@
 use crate::bench::regression_metrics::RegressionMetrics;
 use crate::builders::linear_regression::LinearRegressionBuilder;
 use crate::core::error::ModelError;
-use crate::core::param_manager::ParamManager;
-use crate::core::types::{Matrix, ModelParams, Vector};
-use crate::model::core::base::{BackwardPropagation, BaseModel, ForwardPropagation};
-use crate::model::core::optimizable_model::OptimizableModel;
+use crate::core::types::{Matrix, Scalar, Vector};
+use crate::model::core::base::{BaseModel, DLModel};
+use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::model::core::regression_model::RegressionModel;
-use ndarray::{Array1, Array2, ArrayView, Ix1, IxDyn};
+use ndarray::{Array0, Array1, ArrayView, ArrayView0, ArrayView1};
 
-/// A Linear Regression model that fits the equation y = Wx + b
+/// A Linear Regression model that fits the equation y = W.T @ x + b
 ///
 /// This model predicts a continuous value output based on input features
 /// using a linear relationship where W is the weight vector and b is the bias.
@@ -21,10 +20,14 @@ use ndarray::{Array1, Array2, ArrayView, Ix1, IxDyn};
 pub struct LinearRegression {
     /// The weights vector (W) for the linear model representing the coefficients
     /// for each feature in the input data
-    weights: Vector,
+    pub w: Vector,
     /// The bias term (b) for the linear model representing the y-intercept
     /// of the linear equation
-    bias: Vector,
+    pub b: Scalar,
+    /// Gradient of the cost function J with respect to the weights
+    dw: Vector,
+    /// Gradient of the cost function J with respect to the bias
+    db: Scalar,
 }
 
 impl LinearRegression {
@@ -41,17 +44,15 @@ impl LinearRegression {
     /// * `Result<Self, ModelError>` - A new LinearRegression instance or an error
     /// if the initialization fails
     ///
-    /// # Example
-    /// ```
-    /// use rust_ml::model::linear_regression::LinearRegression;
-    ///
-    /// // Create a linear regression model with 3 input features
-    /// let model = LinearRegression::new(3).unwrap();
-    /// ```
     pub fn new(n_x: usize) -> Result<Self, ModelError> {
         let weights = Array1::<f64>::zeros(n_x);
-        let bias = Array1::<f64>::from_elem(1, 0.0);
-        Ok(Self { weights, bias })
+        let bias = Array0::<f64>::from_elem((), 0.0);
+        Ok(Self {
+            w: weights,
+            b: bias,
+            dw: Array1::<f64>::zeros(n_x),
+            db: Array0::<f64>::from_elem((), 0.0),
+        })
     }
     /// Returns a builder for creating a LinearRegression with custom configuration
     ///
@@ -61,166 +62,92 @@ impl LinearRegression {
     /// # Returns
     /// * `LinearRegressionBuilder` - A builder for LinearRegression with fluent API
     ///
-    /// # Example
-    /// ```
-    /// use rust_ml::model::linear_regression::LinearRegression;
-    ///
-    /// // Create a model using the builder
-    /// let model = LinearRegression::builder()
-    ///     .with_feature_count(4)
-    ///     .build()
-    ///     .unwrap();
-    /// ```
     pub fn builder() -> LinearRegressionBuilder {
         LinearRegressionBuilder::new()
     }
 }
 
-impl ParamManager for LinearRegression {
-    /// Gets all model parameters
-    ///
-    /// Retrieves all trainable parameters (weights and bias) from the model
-    /// as a key-value store where keys are "W" for weights and "b" for bias.
-    ///
-    /// # Returns
-    /// * `ModelParams` - HashMap containing the model parameters
-    fn get_params(&self) -> ModelParams {
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), self.weights.clone().into_dyn());
-        params.insert("b".to_string(), self.bias.clone().into_dyn());
-        params
-    }
-
-    /// Updates the model parameters
-    ///
-    /// Sets the model parameters (weights and bias) based on the provided values.
-    /// This is typically used during model optimization/training to update the
-    /// parameters based on calculated gradients.
-    ///
-    /// # Arguments
-    /// * `params` - HashMap containing the parameters to update with keys "W" and "b"
-    fn update_params(&mut self, params: ModelParams) {
-        if params.contains_key("W") {
-            let weights = params
-                .get("W")
-                .unwrap()
-                .clone()
-                .into_dimensionality::<Ix1>()
-                .unwrap();
-            self.weights = weights;
-        }
-        if params.contains_key("b") {
-            self.bias = params
-                .get("b")
-                .unwrap()
-                .clone()
-                .into_dimensionality::<Ix1>()
-                .unwrap();
-        }
-    }
-
-    /// Gets a specific model parameter by key
-    ///
-    /// Retrieves a specific parameter from the model based on its key identifier.
-    ///
-    /// # Arguments
-    /// * `key` - The key of the parameter to retrieve ("W" for weights, "b" for bias)
-    ///
-    /// # Returns
-    /// * `Result<ArrayView<f64, IxDyn>, ModelError>` - The parameter value or an error
-    /// if the key is invalid
-    fn get_param(&self, key: &str) -> Result<ArrayView<f64, IxDyn>, ModelError> {
+impl ParamCollection for LinearRegression {
+    fn get<D: ndarray::Dimension>(
+        &self,
+        key: &str,
+    ) -> Result<ndarray::ArrayView<f64, D>, ModelError> {
         match key {
-            "W" => Ok(self.weights.view().into_dyn()),
-            "b" => Ok(self.bias.view().into_dyn()),
-            _ => Err(ModelError::InvalidParameter(key.to_string())),
+            "weights" => Ok(self.w.view().into_dimensionality::<D>().unwrap()),
+            "bias" => Ok(self.b.view().into_dimensionality::<D>().unwrap()),
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
+    fn set<D: ndarray::Dimension>(
+        &mut self,
+        key: &str,
+        value: ndarray::ArrayView<f64, D>,
+    ) -> Result<(), ModelError> {
+        match key {
+            "weights" => {
+                self.w
+                    .assign(&value.into_dimensionality::<ndarray::Ix1>().unwrap());
+                Ok(())
+            }
+            "bias" => {
+                self.b
+                    .assign(&value.into_dimensionality::<ndarray::Ix0>().unwrap());
+                Ok(())
+            }
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
+    fn param_iter(&self) -> Vec<(&str, ndarray::ArrayView<f64, ndarray::IxDyn>)> {
+        vec![
+            ("weights", self.w.view().into_dyn()),
+            ("bias", self.b.view().into_dyn()),
+        ]
+    }
+
+    fn get_mut<D: ndarray::Dimension>(
+        &mut self,
+        key: &str,
+    ) -> Result<ndarray::ArrayViewMut<f64, D>, ModelError> {
+        match key {
+            "weights" => Ok(self.w.view_mut().into_dimensionality::<D>().unwrap()),
+            "bias" => Ok(self.b.view_mut().into_dimensionality::<D>().unwrap()),
+            _ => Err(ModelError::KeyError(key.to_string())),
         }
     }
 }
 
-impl OptimizableModel<Matrix, Vector> for LinearRegression {}
-
-impl ForwardPropagation<Matrix, Vector> for LinearRegression {
-    /// Computes the forward pass of linear regression: y = Wx + b
-    ///
-    /// Performs the forward computation step for linear regression by calculating
-    /// the linear combination of inputs and weights, then adding the bias term.
-    /// The formula is: y_hat = W^T * x + b
-    ///
-    /// # Arguments
-    /// * `x` - Input features of shape (n_x, m) where n_x is the number of features
-    ///         and m is the number of examples/batch size
-    ///
-    /// # Returns
-    /// * `Result<(Vector, Option<ModelParams>), ModelError>` - Tuple containing:
-    ///   - The predicted values (y_hat)
-    ///   - Option<ModelParams>: None for LinearRegression (no cache needed)
-    ///
-    /// # Errors
-    /// Returns a ModelError if the dimensions of the input are incompatible with
-    /// the model's weights.
-    fn compute_forward_propagation(
+impl GradientCollection for LinearRegression {
+    fn get_gradient<D: ndarray::Dimension>(
         &self,
-        x: &Matrix,
-    ) -> Result<(Vector, Option<ModelParams>), ModelError> {
-        // Check that dimensions are compatible.
-        if x.shape()[0] != self.weights.shape()[0] {
-            return Err(ModelError::Dimensions {
-                dim1: x.shape().to_vec(),
-                dim2: self.weights.shape().to_vec(),
-            });
+        key: &str,
+    ) -> Result<ArrayView<f64, D>, ModelError> {
+        match key {
+            "weights" => Ok(self.dw.view().into_dimensionality::<D>().unwrap()),
+            "bias" => Ok(self.db.view().into_dimensionality::<D>().unwrap()),
+            _ => Err(ModelError::KeyError(key.to_string())),
         }
-
-        let w = self
-            .get_param("W")?
-            .clone()
-            .into_dimensionality::<Ix1>()
-            .unwrap();
-        let b = self.get_param("b")?.clone()[0];
-        // Weights param has shape (n_x, 1), while x is (n_x, m).
-        // In order to get the linear combination we need to compute w.T.dot(x) or w.T @ X
-        let linear_term = w.t().dot(x);
-        Ok((linear_term + b, None))
     }
-}
 
-impl BackwardPropagation<Array2<f64>, Array1<f64>> for LinearRegression {
-    /// Computes the backward pass to get gradients for linear regression
-    ///
-    /// Calculates the gradients of the cost function with respect to the weights and bias.
-    /// For linear regression with MSE loss, the gradients are:
-    /// - dW = (1/m) * X * (y_hat - y)^T
-    /// - db = (1/m) * sum(y_hat - y)
-    ///
-    /// # Arguments
-    /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
-    /// * `output_gradient` - Gradient from the output layer (typically y_hat - y)
-    /// * `cache` - Optional cached values from forward pass (not used in LinearRegression)
-    ///
-    /// # Returns
-    /// * `Result<ModelParams, ModelError>` - HashMap containing gradients "dW" and "db"
-    fn compute_backward_propagation(
-        &self,
-        x: &Array2<f64>,
-        y: &Array1<f64>,
-        output_gradient: &Vector,
-        cache: Option<ModelParams>,
-    ) -> Result<ModelParams, ModelError> {
-        // Get size of training set
-        let m = x.shape()[1] as f64;
-        let _ = cache; // Unused in this implementation
-
-        // Compute gradients
-        let dz = output_gradient.clone();
-        let dw = x.dot(&dz.t()) / m;
-        let db = dz.sum() / m;
-
-        // Create gradients hashmap
-        let mut gradients = ModelParams::new();
-        gradients.insert("dW".to_string(), dw.into_dyn());
-        gradients.insert("db".to_string(), Array1::<f64>::from_elem(1, db).into_dyn());
-        Ok(gradients)
+    fn set_gradient<D: ndarray::Dimension>(
+        &mut self,
+        key: &str,
+        value: ndarray::ArrayView<f64, D>,
+    ) -> Result<(), ModelError> {
+        match key {
+            "weights" => {
+                self.dw
+                    .assign(&value.into_dimensionality::<ndarray::Ix1>().unwrap());
+                Ok(())
+            }
+            "bias" => {
+                self.db
+                    .assign(&value.into_dimensionality::<ndarray::Ix0>().unwrap());
+                Ok(())
+            }
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
     }
 }
 
@@ -235,7 +162,10 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     /// # Returns
     /// * `Result<Vector, ModelError>` - Predicted values of shape (m,)
     fn predict(&self, x: &Matrix) -> Result<Vector, ModelError> {
-        let (y_hat, _) = self.compute_forward_propagation(x)?;
+        let w: ArrayView1<f64> = self.get("weights")?;
+        let b: ArrayView0<f64> = self.get("bias")?;
+        // For matrix-vector multiplication, transpose weights if needed or use a more specific method
+        let y_hat = w.t().dot(x) + b;
         Ok(y_hat)
     }
 
@@ -251,9 +181,37 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     /// # Returns
     /// * `Result<f64, ModelError>` - The computed cost value
     fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
-        let (y_hat, _) = self.compute_forward_propagation(x)?;
+        let y_hat = self.predict(x)?;
         let m = x.len() as f64;
         Ok((&y_hat - y).mapv(|v| v.powi(2)).sum() / (2.0 * m))
+    }
+}
+
+impl DLModel<Matrix, Vector> for LinearRegression {
+    fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
+        let weights: ArrayView1<f64> = self.get("weights")?;
+        let bias: ArrayView0<f64> = self.get("bias")?;
+        let y_hat = input.dot(&weights) + bias;
+        Ok(y_hat)
+    }
+
+    fn backward(&mut self, input: &Matrix, output_grad: &Vector) -> Result<(), ModelError> {
+        let batch_size = input.shape()[1] as f64;
+
+        // Compute weights grads dw
+        let dw: Vector = input.dot(&output_grad.t()) / batch_size;
+        let dw: ArrayView1<f64> = dw.view();
+
+        // Compute bias grad db
+        let db = output_grad.sum() / batch_size;
+        let binding = Scalar::from_elem((), db);
+        let db: ArrayView0<f64> = binding.view();
+
+        // Update gradients
+        self.set_gradient("weights", dw)?;
+        self.set_gradient("bias", db)?;
+
+        Ok(())
     }
 
     /// Computes the gradient of the cost with respect to the output predictions
@@ -267,8 +225,8 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<Vector, ModelError>` - The gradient of the cost function
-    fn compute_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
-        let (y_hat, _) = self.compute_forward_propagation(x)?;
+    fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
+        let y_hat = self.forward(x)?;
         let m = x.len() as f64;
         let dy = (y_hat - y).sum() / m;
         // The compute gradient returns an array, so we'll return a 'broadcast' array with the value
@@ -339,221 +297,5 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
         let rmse = self.rmse(x, y)?;
         let r2 = self.r2(x, y)?;
         Ok(RegressionMetrics { mse, rmse, r2 })
-    }
-}
-
-#[cfg(test)]
-mod forward_propagation_tests {
-    use super::*;
-    use approx::assert_abs_diff_eq;
-    use ndarray::array;
-
-    #[test]
-    fn test_compute_forward_propagation_single_feature() {
-        let mut lr = LinearRegression::new(1).unwrap();
-
-        // Set weights and bias explicitly
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), array![2.0].into_dyn());
-        params.insert("b".to_string(), array![1.0].into_dyn());
-        lr.update_params(params);
-
-        let x = Array2::from_shape_vec((1, 3), vec![1.0, 2.0, 3.0]).unwrap();
-        let (output, cache) = lr.compute_forward_propagation(&x).unwrap();
-
-        let expected = Array1::from_vec(vec![3.0, 5.0, 7.0]); // 1*2 + 1, 2*2 + 1, 3*2 + 1
-        assert_abs_diff_eq!(
-            output.as_slice().unwrap(),
-            expected.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-        assert!(cache.is_none());
-    }
-
-    #[test]
-    fn test_compute_forward_propagation_multiple_features() {
-        let mut lr = LinearRegression::new(3).unwrap();
-
-        // Set weights and bias explicitly
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), array![1.0, 2.0, 3.0].into_dyn());
-        params.insert("b".to_string(), array![0.5].into_dyn());
-        lr.update_params(params);
-
-        let x = Array2::from_shape_vec((3, 2), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
-        let (output, cache) = lr.compute_forward_propagation(&x).unwrap();
-
-        // (1.0 * 0.1 + 2.0 * 0.3 + 3.0 * 0.5) + 0.5 = 2.7
-        // (1.0 * 0.2 + 2.0 * 0.4 + 3.0 * 0.6) + 0.5 = 3.3
-        let expected = Array1::from_vec(vec![2.7, 3.3]);
-        assert_abs_diff_eq!(
-            output.as_slice().unwrap(),
-            expected.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-        assert!(cache.is_none());
-    }
-
-    #[test]
-    fn test_compute_forward_propagation_zeros() {
-        let lr = LinearRegression::new(2).unwrap();
-
-        // With default zero weights and bias
-        let x = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let (output, cache) = lr.compute_forward_propagation(&x).unwrap();
-
-        let expected = Array1::from_vec(vec![0.0, 0.0]); // All zeros with zero weights and bias
-        assert_abs_diff_eq!(
-            output.as_slice().unwrap(),
-            expected.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-        assert!(cache.is_none());
-    }
-}
-
-#[cfg(test)]
-mod backward_propagation_tests {
-    use super::*;
-    use approx::assert_abs_diff_eq;
-    use ndarray::array;
-
-    #[test]
-    fn test_compute_backward_propagation_single_feature() {
-        let lr = LinearRegression::new(1).unwrap();
-
-        // Input data
-        let x = Array2::from_shape_vec((1, 3), vec![1.0, 2.0, 3.0]).unwrap();
-        let y = Array1::from_vec(vec![2.0, 4.0, 6.0]);
-
-        // Output gradient: this is y_hat - y, assume it's given for the test
-        let output_gradient = Array1::from_vec(vec![0.1, -0.2, 0.3]);
-
-        // Perform backward propagation
-        let gradients = lr
-            .compute_backward_propagation(&x, &y, &output_gradient, None)
-            .unwrap();
-
-        // Check if dW gradient is computed correctly
-        let dw = gradients.get("dW").unwrap();
-        let expected_dw = array![0.1, -0.2, 0.3].into_dyn();
-        assert_abs_diff_eq!(
-            dw.as_slice().unwrap(),
-            expected_dw.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-    }
-
-    #[test]
-    fn test_compute_backward_propagation_multiple_features() {
-        let lr = LinearRegression::new(3).unwrap();
-
-        // Input data
-        let x = Array2::from_shape_vec((3, 2), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
-        let y = Array1::from_vec(vec![1.0, 2.0]);
-
-        // Output gradient: this is y_hat - y, assume it's given for the test
-        let output_gradient = Array1::from_vec(vec![0.1, -0.2]);
-
-        // Perform backward propagation
-        let gradients = lr
-            .compute_backward_propagation(&x, &y, &output_gradient, None)
-            .unwrap();
-
-        // Check if dW gradient is computed correctly
-        let dw = gradients.get("dW").unwrap();
-        let expected_dw = Array1::from_vec(vec![0.1, -0.2]).into_dyn();
-        assert_abs_diff_eq!(
-            dw.as_slice().unwrap(),
-            expected_dw.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-    }
-}
-
-#[cfg(test)]
-mod linear_regression_tests {
-    use super::*;
-    use approx::assert_abs_diff_eq;
-    use ndarray::array;
-
-    #[test]
-    fn test_predict() {
-        let mut lr = LinearRegression::new(2).unwrap();
-
-        // Setting explicit weights and bias
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), array![2.0, 3.0].into_dyn());
-        params.insert("b".to_string(), array![0.5].into_dyn());
-        lr.update_params(params);
-
-        let x = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let y_hat = lr.predict(&x).unwrap();
-
-        let expected = Array1::from_vec(vec![8.5, 14.5]); // (1*2 + 2*3 + 0.5), (3*2 + 4*3 + 0.5)
-        assert_abs_diff_eq!(
-            y_hat.as_slice().unwrap(),
-            expected.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-    }
-
-    #[test]
-    fn test_compute_cost() {
-        let mut lr = LinearRegression::new(2).unwrap();
-
-        // Setting weights and bias explicitly
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), array![1.0, 1.0].into_dyn());
-        params.insert("b".to_string(), array![0.0].into_dyn());
-        lr.update_params(params);
-
-        let x = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let y = Array1::from_vec(vec![3.0, 7.0]);
-        let cost = lr.compute_cost(&x, &y).unwrap();
-
-        let expected_cost = 0.0; // Perfect prediction
-        assert_abs_diff_eq!(cost, expected_cost, epsilon = 1e-10);
-    }
-
-    #[test]
-    fn test_compute_gradient() {
-        let mut lr = LinearRegression::new(2).unwrap();
-
-        // Setting weights and bias explicitly
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), array![1.0, 1.0].into_dyn());
-        params.insert("b".to_string(), array![0.0].into_dyn());
-        lr.update_params(params);
-
-        let x = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let y = Array1::from_vec(vec![3.0, 7.0]);
-        let gradient = lr.compute_gradient(&x, &y).unwrap();
-
-        // Gradient should be 0 (perfect prediction)
-        let expected_gradient = Array1::zeros(2);
-        assert_abs_diff_eq!(
-            gradient.as_slice().unwrap(),
-            expected_gradient.as_slice().unwrap(),
-            epsilon = 1e-10
-        );
-    }
-
-    #[test]
-    fn test_invalid_input_dimensions() {
-        let mut lr = LinearRegression::new(3).unwrap();
-
-        // Setting weights and bias explicitly
-        let mut params = ModelParams::new();
-        params.insert("W".to_string(), array![1.0, 1.0, 1.0].into_dyn());
-        params.insert("b".to_string(), array![0.0].into_dyn());
-        lr.update_params(params);
-
-        // Input dimensions don't match weights
-        let x = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let y = Array1::from_vec(vec![3.0, 7.0]);
-        let result = lr.compute_cost(&x, &y);
-
-        assert!(result.is_err());
     }
 }

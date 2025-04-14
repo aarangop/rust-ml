@@ -7,12 +7,10 @@ use crate::core::activations::relu::ReLU;
 use crate::core::activations::sigmoid::Sigmoid;
 use crate::core::activations::tanh::Tanh;
 use crate::core::error::ModelError;
-use crate::core::param_manager::ParamManager;
-use crate::core::types::{Matrix, ModelParams, Vector};
-use crate::model::core::base::{BackwardPropagation, BaseModel, ForwardPropagation};
+use crate::core::types::{Matrix, Vector};
+use crate::model::core::base::BaseModel;
 use crate::model::core::classification_model::ClassificationModel;
-use crate::model::core::optimizable_model::OptimizableModel;
-use ndarray::{ArrayView, IxDyn};
+use crate::model::logistic_regression::params::LogisticRegressionParams;
 
 /// A logistic regression model for binary classification.
 ///
@@ -129,6 +127,14 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
         Ok(cost.sum())
     }
 
+    fn forward(&mut self, input: &Matrix) -> Result<Vector, ModelError> {
+        todo!()
+    }
+
+    fn backward(&mut self, input: &Matrix, output_grad: &Vector) -> Result<(), ModelError> {
+        todo!()
+    }
+
     /// Computes the gradient for the given input and expected output.
     ///
     /// # Arguments
@@ -139,103 +145,19 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The gradient vector
-    fn compute_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
+    fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         let y_hat = self.predict(x)?;
         Ok(y_hat - y)
     }
-}
 
-/// Implementation of ForwardPropagation trait for LogisticRegression
-impl ForwardPropagation<Matrix, Vector> for LogisticRegression {
-    /// Performs forward propagation through the model.
-    ///
-    /// # Arguments
-    ///
-    /// * `x` - Input feature matrix
-    ///
-    /// # Returns
-    ///
-    /// A tuple containing the output activations and a cache of intermediate values
-    fn compute_forward_propagation(
-        &self,
-        x: &Matrix,
-    ) -> Result<(Vector, Option<ModelParams>), ModelError> {
-        let bias = self.bias[0];
-        let z = self.weights.dot(x) + bias;
-        let a = self.compute_activation(&z)?;
-        let mut cache = ModelParams::new();
-        cache.insert("z".to_string(), z.into_dyn());
-        Ok((a, Some(cache)))
-    }
-}
-
-/// Implementation of BackwardPropagation trait for LogisticRegression
-impl BackwardPropagation<Matrix, Vector> for LogisticRegression {
-    /// Performs backward propagation to compute gradients.
-    ///
-    /// # Arguments
-    ///
-    /// * `x` - Input feature matrix
-    /// * `y` - Expected output vector
-    /// * `output_gradients` - Gradients from the output layer
-    /// * `cache` - Cache of intermediate values from forward propagation
-    ///
-    /// # Returns
-    ///
-    /// A ModelParams object containing the computed gradients
-    fn compute_backward_propagation(
-        &self,
-        x: &Matrix,
-        y: &Vector,
-        output_gradients: &Vector,
-        cache: Option<ModelParams>,
-    ) -> Result<ModelParams, ModelError> {
-        let dz = output_gradients;
-        let dw = x.dot(dz);
-        let db = dz.sum();
-        let mut grads = ModelParams::new();
-        grads.insert("dW".to_string(), dw.into_dyn());
-        grads.insert("db".to_string(), Vector::from_elem(1, db).into_dyn());
-        Ok(grads)
-    }
-}
-
-/// Implementation of ParamManager trait for LogisticRegression
-impl ParamManager for LogisticRegression {
-    /// Gets all model parameters.
-    ///
-    /// # Returns
-    ///
-    /// ModelParams containing all model parameters
-    fn get_params(&self) -> ModelParams {
+    fn params(&self) -> &LogisticRegressionParams {
         todo!()
     }
 
-    /// Updates model parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - New parameters to update the model with
-    fn update_params(&mut self, params: ModelParams) {
-        todo!()
-    }
-
-    /// Gets a specific parameter by key.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key of the parameter to retrieve
-    ///
-    /// # Returns
-    ///
-    /// ArrayView of the requested parameter
-    fn get_param(&self, key: &str) -> Result<ArrayView<f64, IxDyn>, ModelError> {
+    fn params_mut(&mut self) -> &mut LogisticRegressionParams {
         todo!()
     }
 }
-
-/// Implementation of OptimizableModel trait for LogisticRegression
-impl OptimizableModel<Matrix, Vector> for LogisticRegression {}
 
 /// Implementation of ClassificationModel trait for LogisticRegression
 impl ClassificationModel<Matrix, Vector> for LogisticRegression {

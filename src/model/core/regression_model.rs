@@ -1,5 +1,6 @@
 use crate::bench::regression_metrics::RegressionMetrics;
 use crate::core::error::ModelError;
+use crate::model::core::base::DLModel;
 
 /// A trait defining common metrics and evaluation methods for regression models.
 ///
@@ -22,7 +23,7 @@ use crate::core::error::ModelError;
 ///
 /// Methods return `Result<_, ModelError>` to handle cases where metric calculation
 /// might fail, such as with empty inputs or numerical issues.
-pub trait RegressionModel<Input, Output> {
+pub trait RegressionModel<Input, Output>: DLModel<Input, Output> {
     fn mse(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
     fn rmse(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
     fn r2(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;

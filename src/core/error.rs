@@ -5,6 +5,9 @@ pub enum ModelError {
     #[error("Incompatible dimensions:  {dim1:?}, and {dim2:?}")]
     Dimensions { dim1: Vec<usize>, dim2: Vec<usize> },
 
+    #[error("Key error: {0}")]
+    KeyError(String),
+
     #[error("Invalid configuration: {0}")]
     Configuration(String),
 

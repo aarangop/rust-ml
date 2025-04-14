@@ -1,4 +1,4 @@
-use ndarray::{Array, Array1, Array2, IxDyn};
+use ndarray::{Array, Array0, Array1, Array2, ArrayView0, ArrayView1, ArrayView2, IxDyn};
 use std::collections::HashMap;
 
 /// ModelParams is an alias for a hashmap that can be used to store model parameters,
@@ -37,7 +37,9 @@ use std::collections::HashMap;
 /// ```
 ///
 /// This convention makes it easy to match parameters with their corresponding
-/// gradients during optimization steps (e.g., `W1` pairs with `dW1`).
+/// gradients during optim steps (e.g., `W1` pairs with `dW1`).
 pub type ModelParams = HashMap<String, Array<f64, IxDyn>>;
 pub type Matrix = Array2<f64>;
 pub type Vector = Array1<f64>;
+pub type Scalar = Array0<f64>;
+
