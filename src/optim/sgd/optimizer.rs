@@ -5,8 +5,7 @@
 /// model parameters in the direction that minimizes the cost function.
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Vector};
-use crate::model::core::base::{DLModel};
-use crate::model::core::param_collection::{GradientCollection, ParamCollection};
+use crate::model::core::base::DLModel;
 use crate::optim::core::optimizer::Optimizer;
 use crate::optim::core::state::OptimizerState;
 use crate::optim::sgd::state::GradientDescentState;
@@ -48,7 +47,9 @@ impl<Input, Output, M: DLModel<Input, Output>> GradientDescent<Input, Output, M>
     }
 }
 
-impl<M: DLModel<Matrix, Vector>> Optimizer<Matrix, Vector, M> for GradientDescent<Matrix, Vector, M> {
+impl<M: DLModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
+    for GradientDescent<Matrix, Vector, M>
+{
     /// Fits the model to the training data using gradient descent algorithm.
     ///
     /// This method updates the model parameters by computing gradients
@@ -62,13 +63,7 @@ impl<M: DLModel<Matrix, Vector>> Optimizer<Matrix, Vector, M> for GradientDescen
     /// # Returns
     /// * `Ok(())` if optim completes successfully
     /// * `Err(ModelError)` if an error occurs during optim
-    fn fit(
-        &mut self,
-        model: &mut M,
-        x: &Matrix,
-        y: &Vector,
-    ) -> Result<(), ModelError>
-    {
+    fn fit(&mut self, model: &mut M, x: &Matrix, y: &Vector) -> Result<(), ModelError> {
         for _ in 0..self.epochs {
             // Compute cost
             let cost = model.compute_cost(x, y)?;
@@ -81,7 +76,7 @@ impl<M: DLModel<Matrix, Vector>> Optimizer<Matrix, Vector, M> for GradientDescen
             model.backward(x, &output_gradient)?;
 
             // Update model parameters using optimizer state
-            self.state.update_weights(model);
+            self.state.update_weights(model)?;
         }
         Ok(())
     }

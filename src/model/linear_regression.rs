@@ -187,6 +187,32 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     }
 }
 
+#[cfg(test)]
+mod lr_base_model_tests {
+    use crate::model::core::base::BaseModel;
+    use crate::model::linear_regression::LinearRegression;
+    use ndarray::{arr0, arr1, arr2};
+
+    #[test]
+    fn test_predict() {
+        let mut lr = LinearRegression::new(2).unwrap();
+        let x = arr2(&[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        let weights = arr1(&[1.0, 2.0]);
+        let bias = arr0(0.0);
+        // Set weights and bias explicitly.
+        lr.w = weights;
+        lr.b = bias;
+        // y = [1.0 * 1.0 + 2.0*4.0, 1.0 * 2.0 + 2.0 * 5.0, 1.0 * 3.0 + 2.0 * 6.0]
+        // y = [1 + 8, 2 + 10, 3 + 12]
+        // y = [9, 12, 15]
+        let y = arr1(&[9.0, 12.0, 15.0]);
+
+        let y_hat = lr.predict(&x).unwrap();
+
+        assert_eq!(&y, &y_hat);
+    }
+}
+
 impl DLModel<Matrix, Vector> for LinearRegression {
     fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
         let weights: ArrayView1<f64> = self.get("weights")?;
