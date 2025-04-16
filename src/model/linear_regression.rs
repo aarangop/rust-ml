@@ -211,12 +211,35 @@ mod lr_base_model_tests {
     }
 }
 
+/// Implementation of the `OptimizableModel` trait for `LinearRegression`
 impl OptimizableModel<Matrix, Vector> for LinearRegression {
+    /// Performs forward propagation to compute predictions
+    ///
+    /// Calculates the linear function y_hat = W.T @ x + b for a batch of examples.
+    ///
+    /// # Arguments
+    /// * `input` - Input features of shape (n_x, m) where n_x is the number of features and m is the batch size
+    ///
+    /// # Returns
+    /// * `Result<Vector, ModelError>` - The predicted values as a vector of shape (m, )
     fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
         let y_hat = &self.w.t().dot(input) + &self.b;
         Ok(y_hat)
     }
 
+    /// Performs backward propagation to compute gradients
+    ///
+    /// Calculates the gradients of the cost function with respect to the model parameters (weights and bias).
+    /// For linear regression with MSE loss, the gradients are:
+    /// dw = (1/m) * X @ (y_hat - y).T
+    /// db = (1/m) * sum(y_hat - y)
+    ///
+    /// # Arguments
+    /// * `input` - Input features of shape (n_x, m)
+    /// * `output_grad` - Gradient of the cost with respect to the output, typically (y_hat - y)
+    ///
+    /// # Returns
+    /// * `Result<(), ModelError>` - Success or error status of the operation
     fn backward(&mut self, input: &Matrix, output_grad: &Vector) -> Result<(), ModelError> {
         let m = input.shape()[1] as f64;
 
@@ -240,18 +263,15 @@ impl OptimizableModel<Matrix, Vector> for LinearRegression {
 
     /// Computes the gradient of the cost with respect to the output predictions
     ///
-    /// For Mean Squared Error, the gradient dJ/dy_hat is: (1/m) * (y_hat - y)
-    /// where m is the number of examples.
-    ///
-    /// In linear regression the output gradient is a scalar. However, for compatibility
-    /// with the OptimizableModel trait, we return a vector of size 1.
+    /// For Mean Squared Error, the gradient dJ/dy_hat is: (y_hat - y)
+    /// where y_hat is the model's prediction and y is the ground truth.
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
     /// * `y` - Target values of shape (m, )
     ///
     /// # Returns
-    /// * `Result<Vector, ModelError>` - The gradient of the cost function
+    /// * `Result<Vector, ModelError>` - The gradient of the cost function with respect to outputs
     fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         let y_hat = self.forward(x)?;
         let dy = &y_hat - y;
