@@ -2,7 +2,7 @@ use crate::bench::regression_metrics::RegressionMetrics;
 use crate::builders::linear_regression::LinearRegressionBuilder;
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Scalar, Vector};
-use crate::model::core::base::{BaseModel, DLModel};
+use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::model::core::regression_model::RegressionModel;
 use ndarray::{Array0, Array1, ArrayView, ArrayView0, ArrayView1};
@@ -68,10 +68,7 @@ impl LinearRegression {
 }
 
 impl ParamCollection for LinearRegression {
-    fn get<D: ndarray::Dimension>(
-        &self,
-        key: &str,
-    ) -> Result<ndarray::ArrayView<f64, D>, ModelError> {
+    fn get<D: ndarray::Dimension>(&self, key: &str) -> Result<ArrayView<f64, D>, ModelError> {
         match key {
             "weights" => Ok(self.w.view().into_dimensionality::<D>().unwrap()),
             "bias" => Ok(self.b.view().into_dimensionality::<D>().unwrap()),
@@ -93,7 +90,7 @@ impl ParamCollection for LinearRegression {
     fn set<D: ndarray::Dimension>(
         &mut self,
         key: &str,
-        value: ndarray::ArrayView<f64, D>,
+        value: ArrayView<f64, D>,
     ) -> Result<(), ModelError> {
         match key {
             "weights" => {
@@ -110,7 +107,7 @@ impl ParamCollection for LinearRegression {
         }
     }
 
-    fn param_iter(&self) -> Vec<(&str, ndarray::ArrayView<f64, ndarray::IxDyn>)> {
+    fn param_iter(&self) -> Vec<(&str, ArrayView<f64, ndarray::IxDyn>)> {
         vec![
             ("weights", self.w.view().into_dyn()),
             ("bias", self.b.view().into_dyn()),
@@ -133,7 +130,7 @@ impl GradientCollection for LinearRegression {
     fn set_gradient<D: ndarray::Dimension>(
         &mut self,
         key: &str,
-        value: ndarray::ArrayView<f64, D>,
+        value: ArrayView<f64, D>,
     ) -> Result<(), ModelError> {
         match key {
             "weights" => {
@@ -160,7 +157,7 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     /// * `x` - Input features of shape (n_x, m)
     ///
     /// # Returns
-    /// * `Result<Vector, ModelError>` - Predicted values of shape (m,)
+    /// * `Result<Vector, ModelError>` - Predicted values of shape (m, )
     fn predict(&self, x: &Matrix) -> Result<Vector, ModelError> {
         let w: ArrayView1<f64> = self.get("weights")?;
         let b: ArrayView0<f64> = self.get("bias")?;
@@ -176,14 +173,15 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
+    /// * `y` - Target values of shape (m, )
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The computed cost value
     fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let m = x.len() as f64;
-        Ok((&y_hat - y).mapv(|v| v.powi(2)).sum() / (2.0 * m))
+        let cost = (&y_hat - y).powi(2).sum() / (2.0 * m);
+        Ok(cost)
     }
 }
 
@@ -213,23 +211,23 @@ mod lr_base_model_tests {
     }
 }
 
-impl DLModel<Matrix, Vector> for LinearRegression {
+impl OptimizableModel<Matrix, Vector> for LinearRegression {
     fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
-        let weights: ArrayView1<f64> = self.get("weights")?;
-        let bias: ArrayView0<f64> = self.get("bias")?;
-        let y_hat = weights.t().dot(input) + bias;
+        let y_hat = &self.w.t().dot(input) + &self.b;
         Ok(y_hat)
     }
 
     fn backward(&mut self, input: &Matrix, output_grad: &Vector) -> Result<(), ModelError> {
-        let batch_size = input.shape()[1] as f64;
+        let m = input.shape()[1] as f64;
 
         // Compute weights grads dw
-        let dw: Vector = input.dot(&output_grad.t()) / batch_size;
+        let dw: Vector = input.dot(&output_grad.t()) / m;
         let dw: ArrayView1<f64> = dw.view();
 
-        // Compute bias grad db
-        let db = output_grad.sum() / batch_size;
+        // Compute bias grad db.
+        // Mind that in linear regression db = dy = output_grad, and output_grad is a scalar
+        // wrapped in a vector of size 1.
+        let db = output_grad.sum() / m;
         let binding = Scalar::from_elem((), db);
         let db: ArrayView0<f64> = binding.view();
 
@@ -243,21 +241,126 @@ impl DLModel<Matrix, Vector> for LinearRegression {
     /// Computes the gradient of the cost with respect to the output predictions
     ///
     /// For Mean Squared Error, the gradient dJ/dy_hat is: (1/m) * (y_hat - y)
-    /// where m is the number of examples
+    /// where m is the number of examples.
+    ///
+    /// In linear regression the output gradient is a scalar. However, for compatibility
+    /// with the OptimizableModel trait, we return a vector of size 1.
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
+    /// * `y` - Target values of shape (m, )
     ///
     /// # Returns
     /// * `Result<Vector, ModelError>` - The gradient of the cost function
     fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         let y_hat = self.forward(x)?;
-        let m = x.len() as f64;
-        let dy = (y_hat - y).sum() / m;
+        let dy = &y_hat - y;
         // The compute gradient returns an array, so we'll return a 'broadcast' array with the value
         // of `dy`.
-        Ok(Array1::from_elem(y.len(), dy))
+        Ok(dy)
+    }
+}
+
+#[cfg(test)]
+mod lr_optimizable_model_tests {
+    use ndarray::{arr0, arr1, arr2, ArrayView0, ArrayView1};
+
+    use crate::{
+        builders::builder::Builder,
+        model::core::{base::OptimizableModel, param_collection::GradientCollection},
+    };
+
+    use super::LinearRegression;
+
+    #[test]
+    /// Test the forward propagation of the LinearRegression model
+    fn test_forward_propagation() {
+        let n_features = 2;
+        let mut model = LinearRegression::builder()
+            .n_input_features(n_features)
+            .build()
+            .unwrap();
+
+        // Initialize weights and bias
+        let weights = arr1(&[1.0, 2.0]);
+        model.w.assign(&weights);
+        let bias = arr0(0.0);
+        model.b.assign(&bias);
+
+        let x = arr2(&[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        // y = [1.0 * 1.0 + 2.0*4.0, 1.0 * 2.0 + 2.0 * 5.0, 1.0 * 3.0 + 2.0 * 6.0]
+        // y = [1 + 8, 2 + 10, 3 + 12]
+        let y = arr1(&[9.0, 12.0, 15.0]);
+        // Perform forward propagation
+        let y_hat = model.forward(&x).unwrap();
+        // Check if the predicted values match the expected values
+        assert_eq!(y_hat, y);
+        // Check if the weights and bias are unchanged
+        assert_eq!(model.w, weights);
+        assert_eq!(model.b, bias);
+    }
+
+    #[test]
+    fn test_compute_output_grad() {
+        let n_features = 2;
+        let mut model = LinearRegression::builder()
+            .n_input_features(n_features)
+            .build()
+            .unwrap();
+
+        // Initialize weights and bias
+        let weights = arr1(&[1.0, 2.0]);
+        model.w.assign(&weights);
+        let bias = arr0(0.0);
+        model.b.assign(&bias);
+
+        let x = arr2(&[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        let y = arr1(&[8.0, 11.0, 14.0]);
+        // y_hat - y = [1.0, 1.0, 1.0]
+        // dy = (y_hat - y).sum() / m
+        // dy = 3.0 / 3.0 = 1
+        let expected_grad = 1.0;
+        // Compute the output gradient
+        let output_grad = model.compute_output_gradient(&x, &y).unwrap();
+        // Check if the output gradient is computed correctly
+
+        assert_eq!(output_grad[0], expected_grad);
+    }
+
+    #[test]
+    fn test_backward_propagation() {
+        let n_features = 2;
+        let mut model = LinearRegression::builder()
+            .n_input_features(n_features)
+            .build()
+            .unwrap();
+
+        // Initialize weights and bias
+        let weights = arr1(&[1.0, 2.0]);
+        model.w.assign(&weights);
+        let bias = arr0(0.0);
+        model.b.assign(&bias);
+
+        let x = arr2(&[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        let y = arr1(&[8.0, 11.0, 14.0]);
+        // Compute the output gradient
+        let output_grad = model.compute_output_gradient(&x, &y).unwrap();
+        // Perform backward propagation
+        model.backward(&x, &output_grad).unwrap();
+        // Compute expected gradients
+        // dy = (y_hat - y) = [1.0, 1.0, 1.0]
+        // expected_dw = (1/m) * (x @ dy.T)
+        // expected_dw = (1/3) * ([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] @ [1.0, 1.0, 1.0].T)
+        // expected_dw = (1/3) * [[1.0*1.0 + 2.0*1.0 + 3.0*1.0], [4.0*1.0 + 5.0*1.0 + 6.0*1.0]]
+        // expected_dw = (1/3) * [[6.0], [15.0]]
+        let expected_dw = arr1(&[2.0, 5.0]);
+        let expected_db = arr0(1.0);
+
+        // Check if the gradients are computed correctly
+        let dw: ArrayView1<f64> = model.get_gradient("weights").unwrap();
+        let db: ArrayView0<f64> = model.get_gradient("bias").unwrap();
+        assert_eq!(dw, expected_dw);
+        assert_eq!(db, expected_db);
     }
 }
 
@@ -266,7 +369,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
+    /// * `y` - Target values of shape (m, )
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The MSE value
@@ -280,7 +383,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
+    /// * `y` - Target values of shape (m, )
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The RMSE value (square root of MSE)
@@ -299,7 +402,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Arguments
     /// * `x` - Input features of shape (n_x, m)
-    /// * `y` - Target values of shape (m,)
+    /// * `y` - Target values of shape (m, )
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The R² value between 0 and 1

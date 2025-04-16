@@ -5,7 +5,7 @@
 /// model parameters in the direction that minimizes the cost function.
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Vector};
-use crate::model::core::base::DLModel;
+use crate::model::core::base::OptimizableModel;
 use crate::optim::core::optimizer::Optimizer;
 use crate::optim::core::state::OptimizerState;
 use crate::optim::sgd::state::GradientDescentState;
@@ -21,14 +21,14 @@ use crate::optim::sgd::state::GradientDescentState;
 /// * `learning_rate` - The step size for each iteration of gradient descent
 /// * `epochs` - The number of complete passes through the training dataset
 /// * `cost_history` - Records the cost value after each parameter update
-pub struct GradientDescent<Input, Output, M: DLModel<Input, Output>> {
+pub struct GradientDescent<Input, Output, M: OptimizableModel<Input, Output>> {
     learning_rate: f64,
     epochs: usize,
     pub cost_history: Vec<f64>,
     state: GradientDescentState<Input, Output, M>,
 }
 
-impl<Input, Output, M: DLModel<Input, Output>> GradientDescent<Input, Output, M> {
+impl<Input, Output, M: OptimizableModel<Input, Output>> GradientDescent<Input, Output, M> {
     /// Creates a new GradientDescent optimizer.
     ///
     /// # Arguments
@@ -47,7 +47,7 @@ impl<Input, Output, M: DLModel<Input, Output>> GradientDescent<Input, Output, M>
     }
 }
 
-impl<M: DLModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
+impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
     for GradientDescent<Matrix, Vector, M>
 {
     /// Fits the model to the training data using gradient descent algorithm.
@@ -64,9 +64,19 @@ impl<M: DLModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
     /// * `Ok(())` if optim completes successfully
     /// * `Err(ModelError)` if an error occurs during optim
     fn fit(&mut self, model: &mut M, x: &Matrix, y: &Vector) -> Result<(), ModelError> {
-        for _ in 0..self.epochs {
+        for i in 0..self.epochs {
             // Compute cost
             let cost = model.compute_cost(x, y)?;
+
+            // // Check that cost is continually decreasing.
+            // if i > 0 {
+            //     if cost > self.cost_history[i - 1] {
+            //         return Err(ModelError::Convergence(
+            //             "Model is not converging".to_string(),
+            //         ));
+            //     }
+            // }
+
             self.cost_history.push(cost);
 
             // Compute output gradient (includes forward prop)

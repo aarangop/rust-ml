@@ -18,8 +18,9 @@ pub trait BaseModel<Input, Output> {
     fn compute_cost(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
 }
 
-
-pub trait DLModel<Input, Output> : BaseModel<Input, Output> + ParamCollection + GradientCollection {
+pub trait OptimizableModel<Input, Output>:
+    BaseModel<Input, Output> + ParamCollection + GradientCollection
+{
     /// Forward pass through the model.
     fn forward(&self, input: &Input) -> Result<Output, ModelError>;
 

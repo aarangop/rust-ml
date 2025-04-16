@@ -1,16 +1,16 @@
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Vector};
-use crate::model::core::base::DLModel;
+use crate::model::core::base::OptimizableModel;
 use crate::optim::core::state::OptimizerState;
 use ndarray::{ArrayView, ArrayViewMut, IxDyn};
 use std::marker::PhantomData;
 
-pub struct GradientDescentState<Input, Output, M: DLModel<Input, Output>> {
+pub struct GradientDescentState<Input, Output, M: OptimizableModel<Input, Output>> {
     learning_rate: f64,
     _phantom: PhantomData<(Input, Output, M)>,
 }
 
-impl<Input, Output, M: DLModel<Input, Output>> GradientDescentState<Input, Output, M> {
+impl<Input, Output, M: OptimizableModel<Input, Output>> GradientDescentState<Input, Output, M> {
     pub fn new(learning_rate: f64) -> Self {
         Self {
             learning_rate,
@@ -19,7 +19,7 @@ impl<Input, Output, M: DLModel<Input, Output>> GradientDescentState<Input, Outpu
     }
 }
 
-impl<M: DLModel<Matrix, Vector>> OptimizerState<Matrix, Vector, M>
+impl<M: OptimizableModel<Matrix, Vector>> OptimizerState<Matrix, Vector, M>
     for GradientDescentState<Matrix, Vector, M>
 {
     fn update_weights(&mut self, model: &mut M) -> Result<(), ModelError> {

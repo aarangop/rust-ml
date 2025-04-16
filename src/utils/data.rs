@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ndarray::Axis;
+use ndarray::{Axis, Ix1};
 use ndarray_rand::rand::{seq::SliceRandom, SeedableRng};
 use polars::prelude::*;
 
@@ -135,5 +135,44 @@ mod shuffle_split_tests {
             sets_are_different,
             "Training sets should be different when using different seeds"
         );
+    }
+}
+
+pub fn get_features_and_target(df:&DataFrame, features: Vec<&str>, target: &str) -> PolarsResult<(Matrix, Vector)> {
+    let x = df
+        .select(features.into_iter())
+        .unwrap()
+        .to_ndarray::<Float64Type>(IndexOrder::Fortran)
+        .unwrap();
+    let y = df
+        .select([target])
+        .unwrap()
+        .to_ndarray::<Float64Type>(IndexOrder::Fortran)
+        .unwrap()
+        .column(0)
+        .to_owned()
+        .into_dimensionality::<Ix1>()
+        .unwrap();
+
+    Ok((x, y))
+}
+
+#[cfg(test)]
+mod get_features_and_target_tests {
+    use std::path::PathBuf;
+    use crate::utils::data::{load_dataset, get_features_and_target};
+
+    #[test]
+    fn test_get_features_and_target() {
+        let path = PathBuf::from("./datasets/advertising.csv");
+        let df = load_dataset(path).unwrap();
+        let features = vec!["TV", "Radio", "Newspaper"];
+        let target = "Sales";
+
+        let (x, y) = get_features_and_target(&df, features, target).unwrap();
+
+        assert_eq!(x.nrows(), 200);
+        assert_eq!(x.ncols(), 3);
+        assert_eq!(y.len(), 200);
     }
 }

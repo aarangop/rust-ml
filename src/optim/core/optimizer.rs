@@ -1,6 +1,6 @@
 /// Module containing optim traits and implementations for machine learning models.
 use crate::core::error::ModelError;
-use crate::model::core::base::DLModel;
+use crate::model::core::base::OptimizableModel;
 
 
 /// The `Optimizer` trait defines the interface for optim algorithms.
@@ -13,7 +13,7 @@ use crate::model::core::base::DLModel;
 ///
 /// * `Input` - The type of input data used to train the model
 /// * `Output` - The type of output data that the model produces
-pub trait Optimizer<Input, Output, M: DLModel<Input, Output>> {
+pub trait Optimizer<Input, Output, M: OptimizableModel<Input, Output>> {
     /// Fits the provided model to the training data.
     ///
     /// # Arguments
