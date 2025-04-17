@@ -91,13 +91,13 @@ impl LogisticRegressionBuilder {
         self
     }
     /// Sets the classification threshold for the logistic regression model.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `threshold` - The threshold value for classifying predictions (between 0 and 1)
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Self` - Builder instance with updated threshold for method chaining
     pub fn threshold(mut self, threshold: f64) -> Self {
         if threshold < 0.0 || threshold > 1.0 {
@@ -116,6 +116,10 @@ impl Builder<LogisticRegression, Matrix, Vector> for LogisticRegressionBuilder {
     /// * `Result<LogisticRegression, ModelError>` - A new LogisticRegression instance with the
     ///   specified configuration, or an error if construction fails
     fn build(&self) -> Result<LogisticRegression, ModelError> {
-        Ok(LogisticRegression::new(self.n_features, self.activation_fn, self.threshold))
+        Ok(LogisticRegression::new(
+            self.n_features,
+            self.activation_fn,
+            self.threshold,
+        ))
     }
 }

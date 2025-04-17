@@ -9,13 +9,13 @@ pub struct RegressionMetrics {
     /// MSE = (1/n) * Σ(y_pred - y_true)².
     /// Lower values indicate better fit, with 0 being a perfect fit.
     pub mse: f64,
-    
+
     /// Root Mean Squared Error - the square root of MSE, which provides an error measure
     /// in the same units as the target variable.
     /// RMSE = √MSE.
     /// Lower values indicate better fit, with 0 being a perfect fit.
     pub rmse: f64,
-    
+
     /// Coefficient of determination (R²) - measures the proportion of variance in the
     /// dependent variable that is predictable from the independent variable(s).
     /// Range: (-∞, 1.0], where:

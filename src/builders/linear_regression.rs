@@ -8,7 +8,6 @@ use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Vector};
 use crate::model::linear_regression::LinearRegression;
 
-
 /// Builder for creating LinearRegression models with customizable configurations.
 ///
 /// The LinearRegressionBuilder provides methods to configure the properties of a

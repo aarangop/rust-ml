@@ -10,7 +10,6 @@ use crate::optim::core::optimizer::Optimizer;
 use crate::optim::core::state::OptimizerState;
 use crate::optim::sgd::state::GradientDescentState;
 
-
 /// A standard gradient descent optimizer.
 ///
 /// Gradient descent is an optim algorithm that iteratively adjusts parameters
@@ -67,7 +66,7 @@ impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
         for i in 0..self.epochs {
             // Compute cost
             let cost = model.compute_cost(x, y)?;
-            
+
             self.cost_history.push(cost);
 
             // Compute output gradient (includes forward prop)

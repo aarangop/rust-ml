@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use ndarray::{Axis, Ix1};
-use ndarray_rand::rand::{seq::SliceRandom, SeedableRng};
+use ndarray_rand::rand::{SeedableRng, seq::SliceRandom};
 use polars::prelude::*;
 
 use crate::core::types::{Matrix, Vector};
@@ -138,7 +138,11 @@ mod shuffle_split_tests {
     }
 }
 
-pub fn get_features_and_target(df:&DataFrame, features: Vec<&str>, target: &str) -> PolarsResult<(Matrix, Vector)> {
+pub fn get_features_and_target(
+    df: &DataFrame,
+    features: Vec<&str>,
+    target: &str,
+) -> PolarsResult<(Matrix, Vector)> {
     let x = df
         .select(features.into_iter())
         .unwrap()
@@ -159,8 +163,8 @@ pub fn get_features_and_target(df:&DataFrame, features: Vec<&str>, target: &str)
 
 #[cfg(test)]
 mod get_features_and_target_tests {
+    use crate::utils::data::{get_features_and_target, load_dataset};
     use std::path::PathBuf;
-    use crate::utils::data::{load_dataset, get_features_and_target};
 
     #[test]
     fn test_get_features_and_target() {

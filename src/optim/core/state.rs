@@ -1,7 +1,4 @@
-use crate::{
-    core::error::ModelError,
-    model::core::base::OptimizableModel,
-};
+use crate::{core::error::ModelError, model::core::base::OptimizableModel};
 
 /// OptimizerState trait defines the interface for managing the state of an optimizer.
 /// It provides methods to initialize the optimizer state and update the model weights.

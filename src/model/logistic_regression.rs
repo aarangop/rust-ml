@@ -237,7 +237,7 @@ impl OptimizableModel<Matrix, Vector> for LogisticRegression {
 
 #[cfg(test)]
 mod optimizable_model_tests {
-    use ndarray::{arr1, arr2, ArrayView1};
+    use ndarray::{ArrayView1, arr1, arr2};
 
     use crate::builders::builder::Builder;
     use crate::core::activations::activation::Activation;

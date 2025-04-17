@@ -283,7 +283,7 @@ impl OptimizableModel<Matrix, Vector> for LinearRegression {
 
 #[cfg(test)]
 mod lr_optimizable_model_tests {
-    use ndarray::{arr0, arr1, arr2, ArrayView0, ArrayView1};
+    use ndarray::{ArrayView0, ArrayView1, arr0, arr1, arr2};
 
     use crate::{
         builders::builder::Builder,

@@ -13,7 +13,6 @@
 use crate::core::error::ModelError;
 use crate::model::core::base::BaseModel;
 
-
 /// A trait for implementing the Builder pattern for machine learning models.
 ///
 /// This trait ensures that any builder can construct a specific model type

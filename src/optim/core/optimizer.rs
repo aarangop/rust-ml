@@ -2,7 +2,6 @@
 use crate::core::error::ModelError;
 use crate::model::core::base::OptimizableModel;
 
-
 /// The `Optimizer` trait defines the interface for optim algorithms.
 ///
 /// Implementations of this trait can be used to train machine learning models

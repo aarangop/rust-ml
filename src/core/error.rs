@@ -1,6 +1,6 @@
 use ndarray::ShapeError;
-use thiserror::Error;
 use std::convert::From;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ModelError {
@@ -34,7 +34,6 @@ pub enum ModelError {
     #[error("Invalid value: {0}")]
     InvalidValue(String),
 }
-
 
 // Implement conversion from ShapeError to ModelError
 impl From<ShapeError> for ModelError {
