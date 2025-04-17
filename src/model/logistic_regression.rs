@@ -25,6 +25,7 @@ pub struct LogisticRegression {
     pub bias: Vector,
     /// Activation function used for prediction
     pub activation_fn: ActivationFn,
+    threshold: f64,
 }
 
 impl LogisticRegression {
@@ -38,13 +39,19 @@ impl LogisticRegression {
     /// # Returns
     ///
     /// A new LogisticRegression instance with weights initialized to zeros
-    pub fn new(n_features: usize, activation_fn: ActivationFn) -> Self {
+    pub fn new(n_features: usize, activation_fn: ActivationFn, threshold: f64) -> Self {
         let weights = Vector::zeros(n_features);
         let bias = Vector::from_elem(1, 0.0);
+
+        if threshold < 0.0 || threshold > 1.0 {
+            panic!("Threshold must be between 0 and 1");
+        }
+
         Self {
             weights,
             bias,
             activation_fn,
+            threshold,
         }
     }
 
@@ -223,6 +230,7 @@ impl OptimizableModel<Matrix, Vector> for LogisticRegression {
 mod optimizable_model_tests {
     use ndarray::{arr1, arr2, ArrayView1};
 
+    use crate::builders::builder::Builder;
     use crate::core::activations::activation::Activation;
     use crate::core::activations::activation_functions::ActivationFn;
     use crate::core::activations::sigmoid::Sigmoid;
@@ -234,7 +242,11 @@ mod optimizable_model_tests {
     #[test]
     fn test_logistic_regression_forward_sigmoid() {
         // Create model
-        let mut model = LogisticRegression::new(3, ActivationFn::Sigmoid);
+        let mut model = LogisticRegression::builder()
+            .n_features(3)
+            .activation_function(ActivationFn::Sigmoid)
+            .build()
+            .unwrap();
         // Assign weights and bias explicitly.
         let weights = arr1(&[0.5, -0.2, 0.1]);
         let bias = Scalar::from_elem((), 0.2);
@@ -257,7 +269,11 @@ mod optimizable_model_tests {
     #[test]
     fn test_compute_output_gradient() {
         // Create model with sigmoid activation
-        let mut model = LogisticRegression::new(2, ActivationFn::Sigmoid);
+        let mut model = LogisticRegression::builder()
+            .n_features(2)
+            .activation_function(ActivationFn::Sigmoid)
+            .build()
+            .unwrap();
         let weights = arr1(&[0.5, -0.3]);
         let bias = Scalar::from_elem((), 0.1);
         model.weights.assign(&weights);
@@ -270,7 +286,7 @@ mod optimizable_model_tests {
         // Compute forward pass to get predictions
         let y_hat = model.forward(&x).unwrap();
         // Manually compute the gradient using the formula for sigmoid
-        // dz = y_hat - y 
+        // dz = y_hat - y
         let expected_dz = &y_hat - &y;
         // Get the computed gradient
         let dz = model.compute_output_gradient(&x, &y).unwrap();
@@ -286,7 +302,11 @@ mod optimizable_model_tests {
     #[test]
     fn test_backward() {
         // Create model with sigmoid activation
-        let mut model = LogisticRegression::new(2, ActivationFn::Sigmoid);
+        let mut model = LogisticRegression::builder()
+            .n_features(2)
+            .activation_function(ActivationFn::Sigmoid)
+            .build()
+            .unwrap();
         let weights = arr1(&[0.5, -0.3]);
         let bias = Scalar::from_elem((), 0.1);
         model.weights.assign(&weights);
@@ -360,9 +380,104 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
     ///
     /// The computed loss value
     fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
-        let y_hat = self.predict(x)?;
-        let cost = y * y_hat.ln() + (1.0 - y) * (1.0 - y_hat).ln();
+        let y_hat = self.forward(x)?;
+        let cost = -(y * y_hat.ln() + (1.0 - y) * (1.0 - y_hat).ln()) / y.len() as f64;
         Ok(cost.sum())
+    }
+}
+
+#[cfg(test)]
+mod base_model_tests {
+    use super::*;
+    use crate::builders::builder::Builder;
+    use crate::model::core::base::BaseModel;
+    use ndarray::{arr1, arr2};
+
+    #[test]
+    fn test_predict() {
+        // Create a model with known weights and bias
+        let mut model = LogisticRegression::builder()
+            .n_features(2)
+            .activation_function(ActivationFn::Sigmoid)
+            .build()
+            .unwrap();
+        model.weights = arr1(&[0.5, -0.5]);
+        model.bias = arr1(&[0.1]);
+
+        // Create test data
+        let x = arr2(&[[0.2, 0.8], [0.9, 0.1]]); // 2 features, 2 examples
+
+        // Predict
+        let predictions = model.predict(&x).unwrap();
+        // The expected output from the activation function is:
+        // [0.4378235 , 0.61063923], so the prediction should return:
+        // [0.0, 1.0]
+        let expected = arr1(&[0.0, 1.0]);
+
+        // Assert predictions are as expected
+        assert_eq!(predictions.len(), 2);
+        assert_eq!(predictions, expected);
+    }
+
+    #[test]
+    fn test_compute_cost() {
+        // Create a model
+        let mut model = LogisticRegression::builder()
+            .n_features(2)
+            .activation_function(ActivationFn::Sigmoid)
+            .build()
+            .unwrap();
+
+        model.weights = arr1(&[0.2, 0.3]);
+        model.bias = arr1(&[0.1]);
+
+        // Create test data
+        let x = arr2(&[[1.0, 2.0], [3.0, 4.0]]); // 2 features, 2 examples
+        let y = arr1(&[1.0, 0.0]); // Target values
+
+        // First manually calculate the expected output
+        let y_hat = model.forward(&x).unwrap();
+        println!("1 - y_hat: {:?}", 1.0 - &y_hat);
+        let loss = -(&y * &y_hat.ln() + (1.0 - &y) * (1.0 - &y_hat).ln());
+        // &y * &y_hat.ln() + (1.0 - &y) *
+        println!("loss: {:?}", loss);
+        let expected_cost = loss.sum() / 2.0; // Average over the number of samples
+
+        // Get the cost from the model
+        let cost = model.compute_cost(&x, &y).unwrap();
+
+        // Allow for small floating-point differences
+        assert!(
+            (cost - expected_cost).abs() < 1e-5,
+            "Expected cost {}, got {}",
+            expected_cost,
+            cost
+        );
+    }
+
+    #[test]
+    fn test_predict_all_classes() {
+        // Create model with weights that will produce both 0 and 1 predictions
+        let mut model = LogisticRegression::builder()
+            .n_features(2)
+            .activation_function(ActivationFn::Sigmoid)
+            .build()
+            .unwrap();
+        model.weights = arr1(&[2.0, -2.0]);
+        model.bias = arr1(&[0.0]);
+
+        // Create test data to generate both classes
+        let x = arr2(&[
+            [1.0, 0.1], // should predict 1 (positive activation)
+            [0.1, 1.0], // should predict 0 (negative activation)
+        ]);
+
+        // Get predictions
+        let predictions = model.predict(&x).unwrap();
+
+        // Check that we have both classes
+        assert_eq!(predictions[0], 1.0);
+        assert_eq!(predictions[1], 0.0);
     }
 }
 
