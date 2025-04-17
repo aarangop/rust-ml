@@ -33,7 +33,7 @@ pub trait Profiler<Model, Opt, Input, Output> {
     ///
     /// A tuple containing training metrics (including training time) and evaluation metrics
     /// specific to the model type, or a ProfilerError if an error occurs during profiling.
-    fn profile_training(
+    fn train(
         &self,
         model: &mut Model,
         optimizer: &mut Opt,

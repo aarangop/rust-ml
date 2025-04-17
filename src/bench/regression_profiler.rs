@@ -61,7 +61,7 @@ where
     ///
     /// A tuple containing training metrics (including training time) and regression metrics
     /// (MSE, RMSE, R²), or a ProfilerError if an error occurs.
-    fn profile_training(
+    fn train(
         &self,
         model: &mut Model,
         optimizer: &mut Opt,

@@ -67,16 +67,7 @@ impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
         for i in 0..self.epochs {
             // Compute cost
             let cost = model.compute_cost(x, y)?;
-
-            // // Check that cost is continually decreasing.
-            // if i > 0 {
-            //     if cost > self.cost_history[i - 1] {
-            //         return Err(ModelError::Convergence(
-            //             "Model is not converging".to_string(),
-            //         ));
-            //     }
-            // }
-
+            
             self.cost_history.push(cost);
 
             // Compute output gradient (includes forward prop)

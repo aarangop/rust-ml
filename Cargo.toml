@@ -16,9 +16,9 @@ name = "rust-ml"
 path = "src/main.rs"
 
 # Define model-specific binaries
-#[[bin]]
-#name = "logistic-regression"
-#path = "src/bin/logistic_regression.rs"
+[[bin]]
+name = "logistic-regression"
+path = "src/bin/logistic_regression.rs"
 
 #[[bin]]
 #name = "single-layer-classifier"

@@ -30,6 +30,9 @@ pub enum ModelError {
 
     #[error("Shape error: {0}")]
     ShapeError(String),
+
+    #[error("Invalid value: {0}")]
+    InvalidValue(String),
 }
 
 

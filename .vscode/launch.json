@@ -9,12 +9,7 @@
       "request": "launch",
       "name": "Debug unit tests in library 'rust_ml'",
       "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--lib",
-          "--package=rust-ml"
-        ],
+        "args": ["test", "--no-run", "--lib", "--package=rust-ml"],
         "filter": {
           "name": "rust_ml",
           "kind": "lib"
@@ -28,11 +23,7 @@
       "request": "launch",
       "name": "Debug executable 'linear_regression'",
       "cargo": {
-        "args": [
-          "build",
-          "--bin=linear_regression",
-          "--package=rust-ml"
-        ],
+        "args": ["build", "--bin=linear_regression", "--package=rust-ml"],
         "filter": {
           "name": "linear_regression",
           "kind": "bin"
@@ -65,11 +56,7 @@
       "request": "launch",
       "name": "Debug executable 'logistic-regression'",
       "cargo": {
-        "args": [
-          "build",
-          "--bin=logistic-regression",
-          "--package=rust-ml"
-        ],
+        "args": ["build", "--bin=logistic-regression", "--package=rust-ml"],
         "filter": {
           "name": "logistic-regression",
           "kind": "bin"
@@ -102,11 +89,7 @@
       "request": "launch",
       "name": "Debug executable 'rust-ml'",
       "cargo": {
-        "args": [
-          "build",
-          "--bin=rust-ml",
-          "--package=rust-ml"
-        ],
+        "args": ["build", "--bin=rust-ml", "--package=rust-ml"],
         "filter": {
           "name": "rust-ml",
           "kind": "bin"
@@ -120,12 +103,7 @@
       "request": "launch",
       "name": "Debug unit tests in executable 'rust-ml'",
       "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=rust-ml",
-          "--package=rust-ml"
-        ],
+        "args": ["test", "--no-run", "--bin=rust-ml", "--package=rust-ml"],
         "filter": {
           "name": "rust-ml",
           "kind": "bin"

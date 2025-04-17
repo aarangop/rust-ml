@@ -79,11 +79,9 @@ fn main() {
     let profiler: RegressionProfiler<LinearRegression, GD, Matrix, Vector> =
         RegressionProfiler::new();
 
-    println!("The dataset has been normalized, try training again./n");
-
-    // Train the model again.
+    // Train the model using the profiler to extract metrics.
     let (training_metrics, training_performance) = profiler
-        .profile_training(&mut model, &mut gd, &x_train.t().to_owned(), &y_train)
+        .train(&mut model, &mut gd, &x_train.t().to_owned(), &y_train)
         .unwrap();
     let test_performance = model
         .compute_metrics(&x_test.t().to_owned(), &y_test)

@@ -25,6 +25,10 @@ pub struct LogisticRegression {
     pub bias: Vector,
     /// Activation function used for prediction
     pub activation_fn: ActivationFn,
+    /// Gradient of the loss function with respect to the weights
+    dw: Vector,
+    /// Gradient of the loss function with respect to the bias
+    db: Vector,
     threshold: f64,
 }
 
@@ -52,6 +56,8 @@ impl LogisticRegression {
             bias,
             activation_fn,
             threshold,
+            dw: Vector::zeros(n_features),
+            db: Vector::from_elem(1, 0.0),
         }
     }
 
@@ -148,8 +154,8 @@ impl ParamCollection for LogisticRegression {
 impl GradientCollection for LogisticRegression {
     fn get_gradient<D: Dimension>(&self, key: &str) -> Result<ArrayView<f64, D>, ModelError> {
         match key {
-            "weights" => Ok(self.weights.view().into_dimensionality::<D>()?),
-            "bias" => Ok(self.bias.view().into_dimensionality::<D>()?),
+            "weights" => Ok(self.dw.view().into_dimensionality::<D>()?),
+            "bias" => Ok(self.db.view().into_dimensionality::<D>()?),
             _ => Err(ModelError::KeyError(key.to_string())),
         }
     }
@@ -161,11 +167,11 @@ impl GradientCollection for LogisticRegression {
     ) -> Result<(), ModelError> {
         match key {
             "weights" => {
-                self.weights.assign(&value.to_shape(self.weights.shape())?);
+                self.dw.assign(&value.to_shape(self.weights.shape())?);
                 Ok(())
             }
             "bias" => {
-                self.bias.assign(&value.to_shape(self.bias.shape())?);
+                self.db.assign(&value.to_shape(self.bias.shape())?);
                 Ok(())
             }
             _ => Err(ModelError::KeyError(key.to_string())),
@@ -177,7 +183,10 @@ impl OptimizableModel<Matrix, Vector> for LogisticRegression {
     fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
         let z = self.compute_z(input)?;
         let a = self.compute_activation(&z)?;
-        Ok(a)
+        // Make activation numerically safer
+        let epsilon = 1e-15;
+        let a_safe = a.mapv(|val| val.max(epsilon).min(1.0 - epsilon));
+        Ok(a_safe)
     }
 
     fn backward(&mut self, input: &Matrix, dz: &Vector) -> Result<(), ModelError> {
@@ -365,7 +374,7 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
         let bias = self.bias[0];
         let z = self.weights.dot(x) + bias;
         let a = self.compute_activation(&z)?;
-        let y_hat = a.mapv(|x| if x >= 0.5 { 1.0 } else { 0.0 });
+        let y_hat = a.mapv(|x| if x >= self.threshold { 1.0 } else { 0.0 });
         Ok(y_hat)
     }
 
@@ -380,9 +389,11 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
     ///
     /// The computed loss value
     fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+        let m = y.len() as f64;
         let y_hat = self.forward(x)?;
-        let cost = -(y * y_hat.ln() + (1.0 - y) * (1.0 - y_hat).ln()) / y.len() as f64;
-        Ok(cost.sum())
+        let loss = -(y * y_hat.ln() + (1.0 - y) * (1.0 - &y_hat).ln());
+        let cost = loss.sum() / m;
+        Ok(cost)
     }
 }
 
@@ -428,16 +439,15 @@ mod base_model_tests {
             .build()
             .unwrap();
 
-        model.weights = arr1(&[0.2, 0.3]);
-        model.bias = arr1(&[0.1]);
+        model.weights = arr1(&[1.0, 1.0]);
+        model.bias = arr1(&[0.0]);
 
         // Create test data
-        let x = arr2(&[[1.0, 2.0], [3.0, 4.0]]); // 2 features, 2 examples
-        let y = arr1(&[1.0, 0.0]); // Target values
+        let x = arr2(&[[10.0, -10.0], [10.0, -10.0]]); // 2 features, 2 examples
+        let y = arr1(&[0.0, 1.0]); // Target values
 
         // First manually calculate the expected output
         let y_hat = model.forward(&x).unwrap();
-        println!("1 - y_hat: {:?}", 1.0 - &y_hat);
         let loss = -(&y * &y_hat.ln() + (1.0 - &y) * (1.0 - &y_hat).ln());
         // &y * &y_hat.ln() + (1.0 - &y) *
         println!("loss: {:?}", loss);
@@ -495,7 +505,7 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// The accuracy as a value between 0.0 and 1.0
     fn accuracy(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_pred = self.predict(x)?;
-        let y_pred_binary = y_pred.mapv(|val| if val >= 0.5 { 1.0 } else { 0.0 });
+        let y_pred_binary = y_pred.mapv(|val| if val >= self.threshold { 1.0 } else { 0.0 });
         let correct = y_pred_binary
             .iter()
             .zip(y.iter())
@@ -540,9 +550,8 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// The recall as a value between 0.0 and 1.0
     fn recall(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_pred = self.predict(x)?;
-        let y_pred_binary = y_pred.mapv(|val| if val >= 0.5 { 1.0 } else { 0.0 });
 
-        let true_positives = y_pred_binary
+        let true_positives = y_pred
             .iter()
             .zip(y.iter())
             .filter(|&(pred, actual)| *pred > 0.5 && *actual > 0.5)
