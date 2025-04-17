@@ -7,6 +7,7 @@ use crate::builders::builder::Builder;
 use crate::core::activations::activation_functions::ActivationFn;
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Vector};
+use crate::model::logistic_regression::LogisticRegression;
 
 // use crate::model::logistic_regression::LogisticRegression;
 

@@ -1,4 +1,6 @@
+use ndarray::ShapeError;
 use thiserror::Error;
+use std::convert::From;
 
 #[derive(Error, Debug)]
 pub enum ModelError {
@@ -25,4 +27,15 @@ pub enum ModelError {
 
     #[error("Dimensionality error: {0}")]
     DimensionalityError(String),
+
+    #[error("Shape error: {0}")]
+    ShapeError(String),
+}
+
+
+// Implement conversion from ShapeError to ModelError
+impl From<ShapeError> for ModelError {
+    fn from(err: ShapeError) -> Self {
+        ModelError::ShapeError(format!("{}", err))
+    }
 }

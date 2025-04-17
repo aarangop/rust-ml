@@ -8,21 +8,23 @@ use crate::core::activations::sigmoid::Sigmoid;
 use crate::core::activations::tanh::Tanh;
 use crate::core::error::ModelError;
 use crate::core::types::{Matrix, Vector};
-use crate::model::core::base::BaseModel;
+use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::classification_model::ClassificationModel;
-use crate::model::logistic_regression::params::LogisticRegressionParams;
+use crate::model::core::param_collection::{GradientCollection, ParamCollection};
+use ndarray::{ArrayView, ArrayViewMut, Dimension, IxDyn};
 
 /// A logistic regression model for binary classification.
 ///
 /// This model uses a linear combination of features and weights, followed by an activation function,
 /// to predict the probability of an input belonging to a positive class.
+#[derive(Debug)]
 pub struct LogisticRegression {
     /// Model weights for each feature
-    weights: Vector,
+    pub weights: Vector,
     /// Bias term (intercept)
-    bias: Vector,
+    pub bias: Vector,
     /// Activation function used for prediction
-    activation_fn: ActivationFn,
+    pub activation_fn: ActivationFn,
 }
 
 impl LogisticRegression {
@@ -73,6 +75,11 @@ impl LogisticRegression {
         }
     }
 
+    fn compute_z(&self, x: &Matrix) -> Result<Vector, ModelError> {
+        let z = self.weights.t().dot(x) + &self.bias;
+        Ok(z)
+    }
+
     /// Computes the derivative of the activation function for the given input vector.
     ///
     /// # Arguments
@@ -92,6 +99,237 @@ impl LogisticRegression {
     }
 }
 
+impl ParamCollection for LogisticRegression {
+    fn get<D: Dimension>(&self, key: &str) -> Result<ArrayView<f64, D>, ModelError> {
+        match key {
+            "weights" => Ok(self.weights.view().into_dimensionality::<D>()?),
+            "bias" => Ok(self.bias.view().into_dimensionality::<D>()?),
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
+    fn get_mut<D: Dimension>(&mut self, key: &str) -> Result<ArrayViewMut<f64, D>, ModelError> {
+        match key {
+            "weights" => Ok(self.weights.view_mut().into_dimensionality::<D>()?),
+            "bias" => Ok(self.bias.view_mut().into_dimensionality::<D>()?),
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
+    fn set<D: Dimension>(&mut self, key: &str, value: ArrayView<f64, D>) -> Result<(), ModelError> {
+        match key {
+            "weights" => {
+                self.weights.assign(&value.to_shape(self.weights.shape())?);
+                Ok(())
+            }
+            "bias" => {
+                self.bias.assign(&value.to_shape(self.bias.shape())?);
+                Ok(())
+            }
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
+    fn param_iter(&self) -> Vec<(&str, ArrayView<f64, IxDyn>)> {
+        vec![
+            ("weights", self.weights.view().into_dyn()),
+            ("bias", self.bias.view().into_dyn()),
+        ]
+    }
+}
+
+impl GradientCollection for LogisticRegression {
+    fn get_gradient<D: Dimension>(&self, key: &str) -> Result<ArrayView<f64, D>, ModelError> {
+        match key {
+            "weights" => Ok(self.weights.view().into_dimensionality::<D>()?),
+            "bias" => Ok(self.bias.view().into_dimensionality::<D>()?),
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+
+    fn set_gradient<D: Dimension>(
+        &mut self,
+        key: &str,
+        value: ArrayView<f64, D>,
+    ) -> Result<(), ModelError> {
+        match key {
+            "weights" => {
+                self.weights.assign(&value.to_shape(self.weights.shape())?);
+                Ok(())
+            }
+            "bias" => {
+                self.bias.assign(&value.to_shape(self.bias.shape())?);
+                Ok(())
+            }
+            _ => Err(ModelError::KeyError(key.to_string())),
+        }
+    }
+}
+
+impl OptimizableModel<Matrix, Vector> for LogisticRegression {
+    fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
+        let z = self.compute_z(input)?;
+        let a = self.compute_activation(&z)?;
+        Ok(a)
+    }
+
+    fn backward(&mut self, input: &Matrix, dz: &Vector) -> Result<(), ModelError> {
+        let m = input.shape()[1] as f64;
+
+        // Calculate gradients
+        // For matrix dimensions to work correctly:
+        // - input has shape (n_features, n_samples)
+        // - dz has shape (n_samples,)
+        // - to get dw with shape (n_features,), we need to do input.dot(dz)
+        let dw = input.dot(dz) / m;
+        let db = dz.sum() / m;
+
+        // Set the gradients
+        self.set_gradient("weights", dw.view())?;
+        self.set_gradient("bias", ArrayView::from(&[db]))?;
+
+        Ok(())
+    }
+
+    /// Computes the gradient of the loss function with regards to the prediction (dJ/dy)
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Input feature matrix
+    /// * `y` - Expected output vector
+    ///
+    /// # Returns
+    ///
+    /// The gradient vector
+    fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
+        // Forward pass to get predictions
+        let z = self.compute_z(x)?;
+        let y_hat = self.compute_activation(&z)?;
+
+        // Compute the derivative of the activation function
+        let g_prime_of_z = self.compute_derivative(&z)?;
+
+        // Compute the gradient of the loss function with respect to the predictions
+        let dy = (1.0 - y) / (1.0 - &y_hat) - y / &y_hat;
+
+        // Apply the chain rule to get the gradient of the loss function with respect to z
+        // dz = dy * g'(z)
+        let dz = dy * g_prime_of_z;
+        Ok(dz)
+    }
+}
+
+#[cfg(test)]
+mod optimizable_model_tests {
+    use ndarray::{arr1, arr2, ArrayView1};
+
+    use crate::core::activations::activation::Activation;
+    use crate::core::activations::activation_functions::ActivationFn;
+    use crate::core::activations::sigmoid::Sigmoid;
+    use crate::core::types::{Matrix, Scalar};
+    use crate::model::core::base::OptimizableModel;
+    use crate::model::core::param_collection::GradientCollection;
+    use crate::model::logistic_regression::LogisticRegression;
+
+    #[test]
+    fn test_logistic_regression_forward_sigmoid() {
+        // Create model
+        let mut model = LogisticRegression::new(3, ActivationFn::Sigmoid);
+        // Assign weights and bias explicitly.
+        let weights = arr1(&[0.5, -0.2, 0.1]);
+        let bias = Scalar::from_elem((), 0.2);
+        model.weights.assign(&weights);
+        model.bias.assign(&bias);
+        // Create input data
+        let input = Matrix::zeros((3, 3));
+        // Compute expected output.
+        let z = model.weights.t().dot(&input) + bias;
+        let a = Sigmoid::activate(&z);
+        let expected_output = a;
+
+        // Forward pass
+        let output = model.forward(&input).unwrap();
+
+        assert_eq!(output.shape(), [3]);
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_compute_output_gradient() {
+        // Create model with sigmoid activation
+        let mut model = LogisticRegression::new(2, ActivationFn::Sigmoid);
+        let weights = arr1(&[0.5, -0.3]);
+        let bias = Scalar::from_elem((), 0.1);
+        model.weights.assign(&weights);
+        model.bias.assign(&bias);
+
+        // Create test data
+        let x = arr2(&[[0.2, 0.7], [0.3, 0.5]]);
+        let y = arr1(&[0.5, 1.0]); // Expected outputs
+
+        // Compute forward pass to get predictions
+        let y_hat = model.forward(&x).unwrap();
+        // Manually compute the gradient using the formula for sigmoid
+        // dz = y_hat - y 
+        let expected_dz = &y_hat - &y;
+        // Get the computed gradient
+        let dz = model.compute_output_gradient(&x, &y).unwrap();
+
+        // Check dimensions and values (with a small epsilon for floating point comparison)
+        assert_eq!(dz.shape(), expected_dz.shape());
+
+        for (a, b) in dz.iter().zip(expected_dz.iter()) {
+            assert!((a - b).abs() < 1e-5, "Expected {}, got {}", b, a);
+        }
+    }
+
+    #[test]
+    fn test_backward() {
+        // Create model with sigmoid activation
+        let mut model = LogisticRegression::new(2, ActivationFn::Sigmoid);
+        let weights = arr1(&[0.5, -0.3]);
+        let bias = Scalar::from_elem((), 0.1);
+        model.weights.assign(&weights);
+        model.bias.assign(&bias);
+
+        // Create test data
+        let x = arr2(&[[0.2, 0.7], [0.3, 0.5]]); // 2x2 matrix with 2 features and 2 samples
+
+        // Create a test gradient vector
+        let dz = arr1(&[0.1, -0.2]);
+
+        println!("x.shape(): {:?}", x.shape());
+        println!("dz.shape(): {:?}", dz.shape());
+
+        // Call backward
+        model.backward(&x, &dz).unwrap();
+
+        // Manually compute the expected gradients
+        // For weights: dw = (x.dot(dz)) / m where m is number of samples
+        let m = x.shape()[1] as f64;
+        let expected_dw = x.dot(&dz) / m;
+
+        // For bias: db = sum(dz) / m
+        let expected_db = dz.sum() / m;
+
+        // Get the gradients from the model
+        let actual_dw: ArrayView1<f64> = model.get_gradient("weights").unwrap();
+        let actual_db: ArrayView1<f64> = model.get_gradient("bias").unwrap();
+        let actual_db_value = actual_db[0];
+
+        // Check dimensions and values (with a small epsilon for floating point comparison)
+        assert!(
+            (actual_db_value - expected_db).abs() < 1e-5,
+            "Expected {}, got {}",
+            expected_db,
+            actual_db_value
+        );
+
+        for (a, b) in actual_dw.iter().zip(expected_dw.iter()) {
+            assert!((a - b).abs() < 1e-5, "Expected {}, got {}", b, a);
+        }
+    }
+}
 /// Implementation of BaseModel trait for LogisticRegression
 impl BaseModel<Matrix, Vector> for LogisticRegression {
     /// Makes binary predictions for the given input data.
@@ -125,37 +363,6 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
         let y_hat = self.predict(x)?;
         let cost = y * y_hat.ln() + (1.0 - y) * (1.0 - y_hat).ln();
         Ok(cost.sum())
-    }
-
-    fn forward(&mut self, input: &Matrix) -> Result<Vector, ModelError> {
-        todo!()
-    }
-
-    fn backward(&mut self, input: &Matrix, output_grad: &Vector) -> Result<(), ModelError> {
-        todo!()
-    }
-
-    /// Computes the gradient for the given input and expected output.
-    ///
-    /// # Arguments
-    ///
-    /// * `x` - Input feature matrix
-    /// * `y` - Expected output vector
-    ///
-    /// # Returns
-    ///
-    /// The gradient vector
-    fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
-        let y_hat = self.predict(x)?;
-        Ok(y_hat - y)
-    }
-
-    fn params(&self) -> &LogisticRegressionParams {
-        todo!()
-    }
-
-    fn params_mut(&mut self) -> &mut LogisticRegressionParams {
-        todo!()
     }
 }
 
