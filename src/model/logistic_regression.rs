@@ -47,7 +47,7 @@ impl LogisticRegression {
         let weights = Vector::zeros(n_features);
         let bias = Vector::from_elem(1, 0.0);
 
-        if threshold < 0.0 || threshold > 1.0 {
+        if !(0.0..=1.0).contains(&threshold) {
             panic!("Threshold must be between 0 and 1");
         }
 

@@ -41,8 +41,7 @@ impl LinearRegression {
     /// * `n_x` - Number of input features in the dataset
     ///
     /// # Returns
-    /// * `Result<Self, ModelError>` - A new LinearRegression instance or an error
-    /// if the initialization fails
+    /// * `Result<Self, ModelError>` - A new LinearRegression instance or an error if the initialization fails
     ///
     pub fn new(n_x: usize) -> Result<Self, ModelError> {
         let weights = Array1::<f64>::zeros(n_x);

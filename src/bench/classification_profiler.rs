@@ -37,6 +37,12 @@ impl<Model, Opt, Input, Output> ClassificationProfiler<Model, Opt, Input, Output
     }
 }
 
+impl<Model, Opt, Input, Output> Default for ClassificationProfiler<Model, Opt, Input, Output> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Model, Opt, Input, Output> Profiler<Model, Opt, Input, Output>
     for ClassificationProfiler<Model, Opt, Input, Output>
 where
@@ -101,6 +107,8 @@ where
         x: &Input,
         y: &Output,
     ) -> Result<Self::EvalMetrics, ProfilerError> {
-        todo!()
+        // Compute model evaluation metrics.
+        let eval_metrics = model.compute_metrics(x, y)?;
+        Ok(eval_metrics)
     }
 }

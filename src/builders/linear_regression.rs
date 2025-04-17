@@ -63,3 +63,17 @@ impl LinearRegressionBuilder {
         self
     }
 }
+
+impl Default for LinearRegressionBuilder {
+    /// Creates a new LinearRegressionBuilder with default parameter values.
+    ///
+    /// The default number of input features is set to 0 and must be configured
+    /// before building the model.
+    ///
+    /// # Returns
+    ///
+    /// * `Self` - A new LinearRegressionBuilder instance with default settings
+    fn default() -> Self {
+        Self::new()
+    }
+}

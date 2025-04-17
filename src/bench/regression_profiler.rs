@@ -37,6 +37,12 @@ impl<Model, Opt, Input, Output> RegressionProfiler<Model, Opt, Input, Output> {
     }
 }
 
+impl<Model, Opt, Input, Output> Default for RegressionProfiler<Model, Opt, Input, Output> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Model, Opt, Input, Output> Profiler<Model, Opt, Input, Output>
     for RegressionProfiler<Model, Opt, Input, Output>
 where

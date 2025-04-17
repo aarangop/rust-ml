@@ -21,7 +21,6 @@ use crate::optim::sgd::state::GradientDescentState;
 /// * `epochs` - The number of complete passes through the training dataset
 /// * `cost_history` - Records the cost value after each parameter update
 pub struct GradientDescent<Input, Output, M: OptimizableModel<Input, Output>> {
-    learning_rate: f64,
     epochs: usize,
     pub cost_history: Vec<f64>,
     state: GradientDescentState<Input, Output, M>,
@@ -38,7 +37,6 @@ impl<Input, Output, M: OptimizableModel<Input, Output>> GradientDescent<Input, O
     /// A new GradientDescent instance
     pub fn new(learning_rate: f64, epochs: usize) -> Self {
         Self {
-            learning_rate,
             epochs,
             cost_history: Vec::new(),
             state: GradientDescentState::new(learning_rate),
@@ -63,7 +61,7 @@ impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
     /// * `Ok(())` if optim completes successfully
     /// * `Err(ModelError)` if an error occurs during optim
     fn fit(&mut self, model: &mut M, x: &Matrix, y: &Vector) -> Result<(), ModelError> {
-        for i in 0..self.epochs {
+        for _ in 0..self.epochs {
             // Compute cost
             let cost = model.compute_cost(x, y)?;
 

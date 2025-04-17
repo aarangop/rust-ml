@@ -144,7 +144,7 @@ pub fn get_features_and_target(
     target: &str,
 ) -> PolarsResult<(Matrix, Vector)> {
     let x = df
-        .select(features.into_iter())
+        .select(features)
         .unwrap()
         .to_ndarray::<Float64Type>(IndexOrder::Fortran)
         .unwrap();

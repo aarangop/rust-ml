@@ -100,7 +100,7 @@ impl LogisticRegressionBuilder {
     ///
     /// * `Self` - Builder instance with updated threshold for method chaining
     pub fn threshold(mut self, threshold: f64) -> Self {
-        if threshold < 0.0 || threshold > 1.0 {
+        if !(0.0..=1.0).contains(&threshold) {
             panic!("Threshold must be between 0 and 1");
         }
         self.threshold = threshold;
@@ -121,5 +121,19 @@ impl Builder<LogisticRegression, Matrix, Vector> for LogisticRegressionBuilder {
             self.activation_fn,
             self.threshold,
         ))
+    }
+}
+
+
+impl Default for LogisticRegressionBuilder {
+    /// Creates a new LogisticRegressionBuilder with default parameter values.
+    ///
+    /// The default configuration uses 1 feature and the Sigmoid activation function.
+    ///
+    /// # Returns
+    ///
+    /// * `Self` - A new LogisticRegressionBuilder instance with default settings
+    fn default() -> Self {
+        Self::new()
     }
 }
