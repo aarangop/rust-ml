@@ -124,7 +124,6 @@ impl Builder<LogisticRegression, Matrix, Vector> for LogisticRegressionBuilder {
     }
 }
 
-
 impl Default for LogisticRegressionBuilder {
     /// Creates a new LogisticRegressionBuilder with default parameter values.
     ///
