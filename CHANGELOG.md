@@ -10,7 +10,7 @@ and this project adheres to
 
 ### Added
 
-- Github Actions for CI/CD:
+- GitHub Actions for CI/CD:
   - release workflow
   - test workflow
   - coverage workflow
