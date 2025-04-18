@@ -7,11 +7,11 @@
 
 ## Overview
 
-Rust-ML is a **personal project** that aims to combine Rust programming skills
-with machine learning concepts. The project leverages Rust's performance
-characteristics, memory safety guarantees, and expressive type system to build
-reliable machine learning tools while providing an opportunity to deepen
-understanding of both Rust and machine learning algorithms.
+Rust-ML is a personal, and educational project that aims to combine Rust
+programming skills with machine learning concepts. The project leverages Rust's
+performance characteristics, memory safety guarantees, and expressive type
+system to build reliable machine learning tools while providing an opportunity
+to deepen understanding of both Rust and machine learning algorithms.
 
 This is a personal project, and I will be working on it when I have time. If you
 find it useful, feel free to use it, but please keep in mind that it's not a
