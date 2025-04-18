@@ -1,3 +1,10 @@
+# Rust-ML
+
+[![Docs.rs](https://docs.rs/rust-ml/badge.svg)](https://docs.rs/rust-ml)
+[![Build Status](https://github.com/aarangop/rust-ml/workflows/Run%20Tests/badge.svg)](https://github.com/aarangop/rust-ml/actions?query=workflow%3A%22Run+Tests%22)
+[![codecov](https://codecov.io/gh/aarangop/rust-ml/graph/badge.svg?token=CGKZS6ZRUX)](https://codecov.io/gh/aarangop/rust-ml)
+[![License](https://img.shields.io/crates/l/rust-ml.svg)](https://github.com/aarangop/rust-ml/blob/main/LICENSE)
+
 ## Overview
 
 Rust-ML is a **personal project** that aims to combine Rust programming skills
