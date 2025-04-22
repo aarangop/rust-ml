@@ -21,7 +21,7 @@ pub trait ClassificationModel<Input, Output>: OptimizableModel<Input, Output> {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The calculated accuracy score or an error
-    fn accuracy(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn accuracy(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
 
     /// Calculates the loss of the model on the given data.
     ///
@@ -33,7 +33,7 @@ pub trait ClassificationModel<Input, Output>: OptimizableModel<Input, Output> {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The calculated loss value or an error
-    fn loss(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn loss(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
 
     /// Calculates the recall score of the model on the given data.
     ///
@@ -46,7 +46,7 @@ pub trait ClassificationModel<Input, Output>: OptimizableModel<Input, Output> {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The calculated recall score or an error
-    fn recall(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn recall(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
 
     /// Calculates the F1 score of the model on the given data.
     ///
@@ -59,7 +59,7 @@ pub trait ClassificationModel<Input, Output>: OptimizableModel<Input, Output> {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The calculated F1 score or an error
-    fn f1_score(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn f1_score(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
 
     /// Computes multiple evaluation metrics for the model on the given data.
     ///
@@ -72,5 +72,9 @@ pub trait ClassificationModel<Input, Output>: OptimizableModel<Input, Output> {
     ///
     /// # Returns
     /// * `Result<ModelParams, ModelError>` - A collection of calculated metrics or an error
-    fn compute_metrics(&self, x: &Input, y: &Output) -> Result<ClassificationMetrics, ModelError>;
+    fn compute_metrics(
+        &mut self,
+        x: &Input,
+        y: &Output,
+    ) -> Result<ClassificationMetrics, ModelError>;
 }

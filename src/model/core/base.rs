@@ -18,7 +18,9 @@ pub trait BaseModel<Input, Output> {
     fn compute_cost(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
 
     // Returns whether the model is initialized or not.
-    fn model_is_initialized(&self) -> bool;
+    fn model_is_initialized(&self) -> bool {
+        true
+    }
 
     /// Performs any initialization logic necessary for the model.
     /// This is typically called before training or inference, and
@@ -42,5 +44,5 @@ pub trait OptimizableModel<Input, Output>:
     fn backward(&mut self, input: &Input, output_grad: &Output) -> Result<(), ModelError>;
 
     /// Computes the gradient of the cost with respect to the output predictions
-    fn compute_output_gradient(&self, x: &Input, y: &Output) -> Result<Output, ModelError>;
+    fn compute_output_gradient(&mut self, x: &Input, y: &Output) -> Result<Output, ModelError>;
 }

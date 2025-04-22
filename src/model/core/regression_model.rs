@@ -24,8 +24,8 @@ use crate::model::core::base::OptimizableModel;
 /// Methods return `Result<_, ModelError>` to handle cases where metric calculation
 /// might fail, such as with empty inputs or numerical issues.
 pub trait RegressionModel<Input, Output>: OptimizableModel<Input, Output> {
-    fn mse(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
-    fn rmse(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
-    fn r2(&self, x: &Input, y: &Output) -> Result<f64, ModelError>;
-    fn compute_metrics(&self, x: &Input, y: &Output) -> Result<RegressionMetrics, ModelError>;
+    fn mse(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn rmse(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn r2(&mut self, x: &Input, y: &Output) -> Result<f64, ModelError>;
+    fn compute_metrics(&mut self, x: &Input, y: &Output) -> Result<RegressionMetrics, ModelError>;
 }

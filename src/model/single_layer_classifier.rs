@@ -7,7 +7,7 @@ use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::prelude::single_layer_classifier::SingleLayerClassifierBuilder;
 use crate::prelude::*;
-use ndarray::{arr1, arr2, Array1, ArrayView, Dimension};
+use ndarray::{Array1, ArrayView, Dimension, arr1, arr2};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
 use uuid::Uuid;
@@ -338,7 +338,7 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
 
         Ok(total_loss)
     }
-    
+
     fn model_is_initialized(&self) -> bool {
         if self.cache.is_none() {
             return false;
@@ -347,7 +347,11 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
     }
 
     /// Initializes the model with input and output data by creating the necessary cache.
-    fn initialize_model(&mut self, x: Option<&Matrix>, y: Option<&Matrix>) -> Result<(), ModelError> {
+    fn initialize_model(
+        &mut self,
+        x: Option<&Matrix>,
+        y: Option<&Matrix>,
+    ) -> Result<(), ModelError> {
         let x = x.ok_or(ModelError::InvalidParameter(
             "Input data is required for initialization".to_string(),
         ))?;
@@ -789,7 +793,6 @@ mod gradient_collection_tests {
 }
 
 impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
-
     /// Performs a forward pass through the model.
     fn forward(&mut self, input: &Matrix) -> Result<Matrix, ModelError> {
         // Forward pass through the network
@@ -821,7 +824,7 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         Ok(())
     }
 
-    fn compute_output_gradient(&self, _: &Matrix, _: &Matrix) -> Result<Matrix, ModelError> {
+    fn compute_output_gradient(&mut self, _: &Matrix, _: &Matrix) -> Result<Matrix, ModelError> {
         Ok(arr2(&[[0.0]]))
     }
 }

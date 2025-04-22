@@ -157,7 +157,7 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<Vector, ModelError>` - Predicted values of shape (m, )
-    fn predict(&self, x: &Matrix) -> Result<Vector, ModelError> {
+    fn predict(&mut self, x: &Matrix) -> Result<Vector, ModelError> {
         let w: ArrayView1<f64> = self.get("weights")?;
         let b: ArrayView0<f64> = self.get("bias")?;
         // For matrix-vector multiplication, transpose weights if needed or use a more specific method
@@ -176,7 +176,7 @@ impl BaseModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The computed cost value
-    fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn compute_cost(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let m = x.len() as f64;
         let cost = (&y_hat - y).powi(2).sum() / (2.0 * m);
@@ -221,7 +221,7 @@ impl OptimizableModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<Vector, ModelError>` - The predicted values as a vector of shape (m, )
-    fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
+    fn forward(&mut self, input: &Matrix) -> Result<Vector, ModelError> {
         let y_hat = &self.w.t().dot(input) + &self.b;
         Ok(y_hat)
     }
@@ -271,7 +271,7 @@ impl OptimizableModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<Vector, ModelError>` - The gradient of the cost function with respect to outputs
-    fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
+    fn compute_output_gradient(&mut self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         let y_hat = self.forward(x)?;
         let dy = &y_hat - y;
         // The compute gradient returns an array, so we'll return a 'broadcast' array with the value
@@ -392,7 +392,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The MSE value
-    fn mse(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn mse(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let m = x.len() as f64;
         Ok((&y_hat - y).mapv(|v| v.powi(2)).sum() / m)
@@ -406,7 +406,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The RMSE value (square root of MSE)
-    fn rmse(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn rmse(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let m = x.len() as f64;
         let rmse = ((&y_hat - y).mapv(|v| v.powi(2)).sum() / m).sqrt();
@@ -425,7 +425,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<f64, ModelError>` - The R² value between 0 and 1
-    fn r2(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn r2(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_hat = self.predict(x)?;
         let numerator = self.mse(x, y)?;
         let denominator = (y_hat - y.mean().unwrap()).powi(2).sum();
@@ -440,7 +440,7 @@ impl RegressionModel<Matrix, Vector> for LinearRegression {
     ///
     /// # Returns
     /// * `Result<RegressionMetrics, ModelError>` - Struct containing MSE, RMSE, and R²
-    fn compute_metrics(&self, x: &Matrix, y: &Vector) -> Result<RegressionMetrics, ModelError> {
+    fn compute_metrics(&mut self, x: &Matrix, y: &Vector) -> Result<RegressionMetrics, ModelError> {
         let mse = self.mse(x, y)?;
         let rmse = self.rmse(x, y)?;
         let r2 = self.r2(x, y)?;

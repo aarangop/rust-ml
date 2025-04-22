@@ -180,7 +180,7 @@ impl GradientCollection for LogisticRegression {
 }
 
 impl OptimizableModel<Matrix, Vector> for LogisticRegression {
-    fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
+    fn forward(&mut self, input: &Matrix) -> Result<Vector, ModelError> {
         let z = self.compute_linear_activation(input)?;
         let a = self.compute_activation(&z)?;
         // Make activation numerically safer
@@ -217,7 +217,7 @@ impl OptimizableModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The gradient vector
-    fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
+    fn compute_output_gradient(&mut self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         // Forward pass to get predictions
         let z = self.compute_linear_activation(x)?;
         let y_hat = self.compute_activation(&z)?;
@@ -370,7 +370,7 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// A vector of predictions (0.0 or 1.0)
-    fn predict(&self, x: &Matrix) -> Result<Vector, ModelError> {
+    fn predict(&mut self, x: &Matrix) -> Result<Vector, ModelError> {
         let bias = self.bias[0];
         let z = self.weights.dot(x) + bias;
         let a = self.compute_activation(&z)?;
@@ -388,7 +388,7 @@ impl BaseModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The computed loss value
-    fn compute_cost(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn compute_cost(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let m = y.len() as f64;
         let y_hat = self.forward(x)?;
         let loss = -(y * y_hat.ln() + (1.0 - y) * (1.0 - &y_hat).ln());
@@ -503,7 +503,7 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The accuracy as a value between 0.0 and 1.0
-    fn accuracy(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn accuracy(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_pred = self.predict(x)?;
         let y_pred_binary = y_pred.mapv(|val| if val >= self.threshold { 1.0 } else { 0.0 });
         let correct = y_pred_binary
@@ -524,7 +524,7 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The computed loss value
-    fn loss(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn loss(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         // Binary cross-entropy loss
         let y_pred = self.predict(x)?;
         let epsilon = 1e-15; // prevent log(0)
@@ -548,7 +548,7 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The recall as a value between 0.0 and 1.0
-    fn recall(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn recall(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_pred = self.predict(x)?;
 
         let true_positives = y_pred
@@ -576,7 +576,7 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// The F1 score as a value between 0.0 and 1.0
-    fn f1_score(&self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
+    fn f1_score(&mut self, x: &Matrix, y: &Vector) -> Result<f64, ModelError> {
         let y_pred = self.predict(x)?;
         let y_pred_binary = y_pred.mapv(|val| if val >= 0.5 { 1.0 } else { 0.0 });
 
@@ -627,7 +627,11 @@ impl ClassificationModel<Matrix, Vector> for LogisticRegression {
     /// # Returns
     ///
     /// A ClassificationMetrics struct containing accuracy, loss, precision, recall and F1 score
-    fn compute_metrics(&self, x: &Matrix, y: &Vector) -> Result<ClassificationMetrics, ModelError> {
+    fn compute_metrics(
+        &mut self,
+        x: &Matrix,
+        y: &Vector,
+    ) -> Result<ClassificationMetrics, ModelError> {
         let accuracy = self.accuracy(x, y)?;
         let loss = self.loss(x, y)?;
         let recall = self.recall(x, y)?;
