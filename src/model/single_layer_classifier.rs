@@ -7,7 +7,7 @@ use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::prelude::single_layer_classifier::SingleLayerClassifierBuilder;
 use crate::prelude::*;
-use ndarray::{ArrayView, Dimension};
+use ndarray::{ArrayView, Dimension, arr2};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
 
@@ -415,14 +415,14 @@ mod base_model_tests {
         let x = Matrix::from_shape_vec((2, 3), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
 
         // For perfect predictions, cost should be close to 0
-        let perfect_preds = Matrix::from_shape_vec((1, 3), vec![1.0, 0.0, 1.0]).unwrap();
+        let _ = Matrix::from_shape_vec((1, 3), vec![1.0, 0.0, 1.0]).unwrap();
         let perfect_y = Matrix::from_shape_vec((1, 3), vec![1.0, 0.0, 1.0]).unwrap();
 
         let cost_perfect = classifier.compute_cost(&x, &perfect_y).unwrap();
         assert_relative_eq!(cost_perfect, 0.0, epsilon = 1e-10);
 
         // For completely wrong predictions, cost should be high
-        let wrong_preds = Matrix::from_shape_vec((1, 3), vec![0.01, 0.99, 0.01]).unwrap();
+        let _ = Matrix::from_shape_vec((1, 3), vec![0.01, 0.99, 0.01]).unwrap();
         let wrong_y = Matrix::from_shape_vec((1, 3), vec![0.99, 0.01, 0.99]).unwrap();
 
         let cost_wrong = classifier.compute_cost(&x, &wrong_y).unwrap();
@@ -754,14 +754,15 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         Ok(a2)
     }
 
-    fn backward(&mut self, input: &Matrix, output_grad: &Matrix) -> Result<(), ModelError> {
-        todo!()
+    fn backward(&mut self, _: &Matrix, _: &Matrix) -> Result<(), ModelError> {
+        Ok(())
     }
 
-    fn compute_output_gradient(&self, x: &Matrix, y: &Matrix) -> Result<Matrix, ModelError> {
-        todo!()
+    fn compute_output_gradient(&self, _: &Matrix, _: &Matrix) -> Result<Matrix, ModelError> {
+        Ok(arr2(&[[0.0]]))
     }
 }
+
 #[cfg(test)]
 mod optimizable_model_tests {
     use super::*;

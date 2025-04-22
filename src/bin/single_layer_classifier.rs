@@ -6,10 +6,10 @@ use polars::{
     prelude::{Float64Type, IndexOrder},
 };
 use rust_ml::optim::sgd::optimizer::GradientDescent;
-use rust_ml::prelude::{Matrix, SingleLayerClassifier, Vector};
+use rust_ml::prelude::{Matrix, SingleLayerClassifier};
 use rust_ml::utils::data::{load_dataset, shuffle_split};
 
-type GD = GradientDescent<Matrix, Vector, SingleLayerClassifier>;
+type GD = GradientDescent<Matrix, Matrix, SingleLayerClassifier>;
 /// In this example, we will try using the SingleLayerClassifier
 /// from the rust_ml library to classify a simple dataset.
 /// To compare the performance of the model against simple logistic regression,
@@ -45,7 +45,7 @@ fn main() -> Result<(), PolarsError> {
     let features = (&features - &mean) / &std;
 
     // Create train and test sets.
-    let (x_train, y_train, x_test, y_test) = shuffle_split(&features, &target, 0.8, 42);
+    // let (x_train, y_train, x_test, y_test) = shuffle_split(&features, &target, 0.8, 42);
 
     // Initialize the optimizer
     let gd: GD = GradientDescent::new(0.01, 1000);
