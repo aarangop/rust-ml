@@ -1716,6 +1716,7 @@ dependencies = [
  "polars",
  "rand 0.9.1",
  "thiserror",
+ "uuid",
 ]
 
 [[package]]

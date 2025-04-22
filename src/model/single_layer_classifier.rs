@@ -10,6 +10,17 @@ use crate::prelude::*;
 use ndarray::{ArrayView, Dimension, arr2};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
+use uuid::Uuid;
+
+/// Cache for storing intermediate values during forward pass.
+#[derive(Debug, Clone)]
+pub struct SingleLayerClassifierCache {
+    pub a1: Option<Matrix>,
+    pub z1: Option<Matrix>,
+    pub a2: Option<Matrix>,
+    pub z2: Option<Matrix>,
+    pub cache_id: Option<Uuid>,
+}
 
 /// Single hidden layer classifier model.
 /// This model is a simple feedforward neural network with one hidden layer.
@@ -37,6 +48,8 @@ pub struct SingleLayerClassifier {
     output_layer_activation_fn: ActivationFn,
     hidden_layer_activation_fn: ActivationFn,
     threshold: f64,
+    cache: SingleLayerClassifierCache,
+    current_cache_id: Option<Uuid>,
 }
 
 impl SingleLayerClassifier {
@@ -100,6 +113,14 @@ impl SingleLayerClassifier {
         let w2 = Matrix::random((1, n_hidden_nodes), distribution);
         let b2 = Vector::zeros(1);
 
+        let cache = SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: None,
+            z2: None,
+            cache_id: None,
+        };
+
         Ok(Self {
             w1,
             b1,
@@ -108,6 +129,8 @@ impl SingleLayerClassifier {
             output_layer_activation_fn,
             hidden_layer_activation_fn,
             threshold,
+            cache,
+            current_cache_id: None,
         })
     }
 

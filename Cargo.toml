@@ -35,3 +35,4 @@ ndarray-rand = "0.15.0"
 polars = { version = "0.46.0", features = ["csv", "dtype-full", "lazy", "ndarray", "polars-io"] }
 rand = "0.9.1"
 thiserror = "2.0.12"
+uuid = "1.16.0"
