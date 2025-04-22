@@ -33,6 +33,9 @@ pub enum ModelError {
 
     #[error("Invalid value: {0}")]
     InvalidValue(String),
+
+    #[error("Uninitialized model: {0}")]
+    UninitializedModel(String),
 }
 
 // Implement conversion from ShapeError to ModelError
