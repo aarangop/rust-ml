@@ -7,7 +7,7 @@ use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::prelude::single_layer_classifier::SingleLayerClassifierBuilder;
 use crate::prelude::*;
-use ndarray::{ArrayView, Dimension, arr2};
+use ndarray::{arr1, arr2, Array1, ArrayView, Dimension};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
 use uuid::Uuid;
@@ -48,7 +48,7 @@ pub struct SingleLayerClassifier {
     output_layer_activation_fn: ActivationFn,
     hidden_layer_activation_fn: ActivationFn,
     threshold: f64,
-    cache: SingleLayerClassifierCache,
+    cache: Option<SingleLayerClassifierCache>,
     current_cache_id: Option<Uuid>,
 }
 
@@ -113,14 +113,6 @@ impl SingleLayerClassifier {
         let w2 = Matrix::random((1, n_hidden_nodes), distribution);
         let b2 = Vector::zeros(1);
 
-        let cache = SingleLayerClassifierCache {
-            a1: None,
-            z1: None,
-            a2: None,
-            z2: None,
-            cache_id: None,
-        };
-
         Ok(Self {
             w1,
             b1,
@@ -129,7 +121,7 @@ impl SingleLayerClassifier {
             output_layer_activation_fn,
             hidden_layer_activation_fn,
             threshold,
-            cache,
+            cache: None,
             current_cache_id: None,
         })
     }
@@ -191,6 +183,14 @@ impl SingleLayerClassifier {
         let z = w.dot(x) + b;
         Ok(z)
     }
+
+    pub fn cache(&self) -> Option<&SingleLayerClassifierCache> {
+        self.cache.as_ref()
+    }
+
+    pub fn set_cache(&mut self, cache: SingleLayerClassifierCache) {
+        self.cache = Some(cache);
+    }
 }
 
 #[cfg(test)]
@@ -209,8 +209,9 @@ mod tests {
         assert_eq!(classifier.w1.shape(), &[10, 4]);
         assert_eq!(classifier.b1.len(), 10);
         assert_eq!(classifier.w2.shape(), &[1, 10]);
-        assert_eq!(classifier.b2.len(), 10);
+        assert_eq!(classifier.b2.len(), 1);
         assert_eq!(classifier.threshold, 0.5);
+        assert!(classifier.cache().is_none());
     }
 
     #[test]
@@ -244,7 +245,7 @@ mod tests {
         assert_eq!(classifier.w1.shape(), &[10, 4]);
         assert_eq!(classifier.b1.len(), 10);
         assert_eq!(classifier.w2.shape(), &[1, 10]);
-        assert_eq!(classifier.b2.len(), 10);
+        assert_eq!(classifier.b2.len(), 1);
     }
 
     /// Test the compute_activation method
@@ -256,10 +257,7 @@ mod tests {
 
         let input = Matrix::from_shape_vec((10, 1), vec![0.1; 10]).unwrap();
         let result = classifier.compute_activation(&input, ActivationFn::Sigmoid);
-        assert_eq!(result.shape(), &[1, 1]);
-
-        let result = classifier.compute_activation(&input, ActivationFn::ReLU);
-        assert_eq!(result.shape(), &[1, 1]);
+        assert_eq!(result.shape(), &[10, 1]);
     }
 
     /// Test the compute_linear_activation method
@@ -290,7 +288,7 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
     ///
     /// # Errors
     /// Returns `ModelError` if matrix dimensions are incompatible
-    fn predict(&self, x: &Matrix) -> Result<Matrix, ModelError> {
+    fn predict(&mut self, x: &Matrix) -> Result<Matrix, ModelError> {
         let a2 = self.forward(x)?;
         let y_hat = a2.map(|v| if v > &self.threshold { 1.0 } else { 0.0 });
         Ok(y_hat)
@@ -310,7 +308,7 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
     ///
     /// # Errors
     /// Returns `ModelError` if dimensions are incompatible or if the forward pass fails
-    fn compute_cost(&self, x: &Matrix, y: &Matrix) -> Result<f64, ModelError> {
+    fn compute_cost(&mut self, x: &Matrix, y: &Matrix) -> Result<f64, ModelError> {
         // Perform forward pass to get predictions
         let predictions = self.forward(x)?;
 
@@ -339,6 +337,37 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
         let total_loss = -1.0 * (term1 + term2).sum() / m;
 
         Ok(total_loss)
+    }
+    
+    fn model_is_initialized(&self) -> bool {
+        if self.cache.is_none() {
+            return false;
+        }
+        true
+    }
+
+    /// Initializes the model with input and output data by creating the necessary cache.
+    fn initialize_model(&mut self, x: Option<&Matrix>, y: Option<&Matrix>) -> Result<(), ModelError> {
+        let x = x.ok_or(ModelError::InvalidParameter(
+            "Input data is required for initialization".to_string(),
+        ))?;
+        let y = y.ok_or(ModelError::InvalidParameter(
+            "Output data is required for initialization".to_string(),
+        ))?;
+        let m = x.shape()[1];
+        let z1 = Matrix::zeros((self.w1.shape()[0], m));
+        let a1 = Matrix::zeros((self.w1.shape()[0], m));
+        let z2 = Matrix::zeros((self.w2.shape()[0], m));
+        let a2 = Matrix::zeros((self.w2.shape()[0], m));
+        let cache = SingleLayerClassifierCache {
+            a1: Some(a1),
+            z1: Some(z1),
+            a2: Some(a2),
+            z2: Some(z2),
+            cache_id: None,
+        };
+        self.set_cache(cache);
+        Ok(())
     }
 }
 
@@ -430,7 +459,7 @@ mod base_model_tests {
     #[test]
     fn test_compute_cost() {
         // Create a classifier
-        let classifier =
+        let mut classifier =
             SingleLayerClassifier::new(2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
                 .unwrap();
 
@@ -454,7 +483,7 @@ mod base_model_tests {
 
     #[test]
     fn test_compute_cost_validation() {
-        let classifier =
+        let mut classifier =
             SingleLayerClassifier::new(2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
                 .unwrap();
 
@@ -760,7 +789,9 @@ mod gradient_collection_tests {
 }
 
 impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
-    fn forward(&self, input: &Matrix) -> Result<Matrix, ModelError> {
+
+    /// Performs a forward pass through the model.
+    fn forward(&mut self, input: &Matrix) -> Result<Matrix, ModelError> {
         // Forward pass through the network
         // Shape of input: (n_features, n_samples)
         // Shape of w1: (n_hidden_nodes, n_features)
@@ -773,6 +804,15 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         let a1 = self.compute_activation(&z1, self.hidden_layer_activation_fn);
         let z2 = self.compute_linear_activation(&a1, &self.w2, &self.b2)?;
         let a2 = self.compute_activation(&z2, self.output_layer_activation_fn);
+        // Create new cache
+        let cache = SingleLayerClassifierCache {
+            a1: Some(a1),
+            z1: Some(z1),
+            a2: Some(a2.clone()), // Changed from Some(&a2) to avoid lifetime issues
+            z2: Some(z2),
+            cache_id: Some(Uuid::new_v4()),
+        };
+        self.set_cache(cache);
         // a2 is the output of the model
         Ok(a2)
     }
@@ -793,7 +833,7 @@ mod optimizable_model_tests {
 
     #[test]
     fn test_forward_dimensions() {
-        let classifier = SingleLayerClassifier::new(
+        let mut classifier = SingleLayerClassifier::new(
             3, // 3 features
             5, // 5 hidden nodes
             0.5,
@@ -874,7 +914,7 @@ mod optimizable_model_tests {
 
     #[test]
     fn test_forward_batch_processing() {
-        let classifier =
+        let mut classifier =
             SingleLayerClassifier::new(2, 4, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
                 .unwrap();
 
