@@ -88,7 +88,7 @@ impl LogisticRegression {
         }
     }
 
-    fn compute_z(&self, x: &Matrix) -> Result<Vector, ModelError> {
+    fn compute_linear_activation(&self, x: &Matrix) -> Result<Vector, ModelError> {
         let z = self.weights.t().dot(x) + &self.bias;
         Ok(z)
     }
@@ -181,7 +181,7 @@ impl GradientCollection for LogisticRegression {
 
 impl OptimizableModel<Matrix, Vector> for LogisticRegression {
     fn forward(&self, input: &Matrix) -> Result<Vector, ModelError> {
-        let z = self.compute_z(input)?;
+        let z = self.compute_linear_activation(input)?;
         let a = self.compute_activation(&z)?;
         // Make activation numerically safer
         let epsilon = 1e-15;
@@ -219,7 +219,7 @@ impl OptimizableModel<Matrix, Vector> for LogisticRegression {
     /// The gradient vector
     fn compute_output_gradient(&self, x: &Matrix, y: &Vector) -> Result<Vector, ModelError> {
         // Forward pass to get predictions
-        let z = self.compute_z(x)?;
+        let z = self.compute_linear_activation(x)?;
         let y_hat = self.compute_activation(&z)?;
 
         // Compute the derivative of the activation function

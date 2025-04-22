@@ -14,28 +14,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Extract tag name
-        id: tag_name
-        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-      - name: Generate simple changelog
+      - name: Generate changelog
+        id: changelog
         run: |
           # Get the latest tag before this one
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
           if [ -z "$PREVIOUS_TAG" ]; then
             # If no previous tag exists, get all commits
-            git log --pretty=format:"- %s" > changelog.md
+            echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"- %s" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           else
             # Get commits between the previous tag and this one
-            git log --pretty=format:"- %s" ${PREVIOUS_TAG}..HEAD > changelog.md
+            echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"- %s" ${PREVIOUS_TAG}..HEAD >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
-          body_path: changelog.md
+          body: |
+            ## Changelog
+            ${{ steps.changelog.outputs.CHANGELOG }}
           draft: false
           prerelease: false
         env:

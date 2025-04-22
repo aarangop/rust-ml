@@ -1,0 +1,4 @@
+  dev                     efe1892 Fix release workflow
+  main                    4e0bd7f Fix clippy warnings
+  simplify-deps           9b17a66 Unit tests for single layer builder, and single layer classifier implementation
+* single-layer-classifier 08f7ce9 Fix release.yml conflict

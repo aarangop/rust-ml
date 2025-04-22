@@ -1,0 +1,56 @@
+commit 4e0bd7f0c442c8062167cdc80d688907538b14f2
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 19:23:11 2025 -0500
+
+    Fix clippy warnings
+
+commit 5222e0b2891fb6cef11c67d748fb669288114392
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 19:27:52 2025 -0500
+
+    Fix release.yml conflict
+
+commit 9338a7fd7046013eb53d9420a86c33042ffa98af
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 19:08:16 2025 -0500
+
+    Implement forward propagation for single layer classifier
+
+commit facb58f2db3bdd5f1dc0fced46186c139adc59eb
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 15:55:03 2025 -0500
+
+    Write unit tests for forward pass single layer classifier
+
+commit eabd6a16d2311c33d6c95e0e5c11366077bd6ec7
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 13:25:13 2025 -0500
+
+    Unit tests for single layer builder, and single layer classifier implementation
+
+commit 4830d2c784aadbaf8798795458c66bff255f9a52
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 13:06:01 2025 -0500
+
+    Impl BaseModel, ParamCollection, for single layer classifier, implement SLClass. builder
+
+commit 6dedfea0c2779b883c35ecb977455bf140fbeb5e
+Author: Andres Arango <andresap@proton.me>
+Date:   Mon Apr 21 19:27:04 2025 -0500
+
+    update changelog
+
+commit 90024e2d3e90325851798c439d4de0d4fc41c0ef
+Merge: aa4b2f3 efe1892
+Author: Andres Arango <andresap@protonmail.com>
+Date:   Fri Apr 18 14:53:53 2025 -0500
+
+    Merge pull request #7 from aarangop/dev
+    
+    Fix release workflow
+
+commit efe189221ab307e68dcebdbd873c454138be16be
+Author: Andres Arango <andresap@proton.me>
+Date:   Fri Apr 18 11:49:08 2025 -0500
+
+    Fix release workflow

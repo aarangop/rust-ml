@@ -1,0 +1,72 @@
+* 08f7ce9 (HEAD -> single-layer-classifier) Fix release.yml conflict
+* d815faa (origin/single-layer-classifier) Update version
+* 24d696f Update version
+* f87e75d Update release.yml
+* dda7c40 Fix clippy warnings
+* 243d4d0 Fix release.yml conflict
+*   f58299a Fix merge conflicts
+|\  
+| * d1eef61 Fix clippy warnings
+| * bd00ff3 Increment version for next release
+| * 65d26f7 Fix Test badge reference on Readme.md
+| * 7a6bcef Apply cargo fmt
+| * 9349ed9 Update .github/workflows/coverage.yml
+| * 3c699dd Implement forward propagation for single layer classifier
+| * 998afad Write unit tests for forward pass single layer classifier
+| * 9b17a66 (simplify-deps) Unit tests for single layer builder, and single layer classifier implementation
+| * 43bc529 Impl BaseModel, ParamCollection, for single layer classifier, implement SLClass. builder
+| * f395649 update changelog
+| | * 4e0bd7f (main) Fix clippy warnings
+| | * 5222e0b Fix release.yml conflict
+| | * 9338a7f Implement forward propagation for single layer classifier
+| | * facb58f Write unit tests for forward pass single layer classifier
+| | * eabd6a1 Unit tests for single layer builder, and single layer classifier implementation
+| | * 4830d2c Impl BaseModel, ParamCollection, for single layer classifier, implement SLClass. builder
+| | * 6dedfea update changelog
+| | * 90024e2 (origin/main) Merge pull request #7 from aarangop/dev
+| |/| 
+|/| | 
+| | * efe1892 (tag: v0.1.5, origin/dev, dev) Fix release workflow
+* | |   aa4b2f3 Merge pull request #4 from aarangop/dev
+|\ \ \  
+| | |/  
+| |/|   
+| * | 62d8711 Update CHANGELOG.md
+| * | 7ac98d2 (tag: v0.1.4) Increment version for next release
+| * | dbdf356 Fix Test badge reference on Readme.md
+| * | 6866817 Setup github actions
+| * | fa5d7a9 Update .github/workflows/coverage.yml
+| |/  
+| * 0272b3d Add badges, setup coverage action
+|/  
+* cbff64b format
+* 281dd6b Fix clippy warnings
+* 7bf44cf Format
+* aedbc4c Add testing workflow
+* cc66412 Update version close #1 #2
+* f2d8ef2 Remove coverage report
+* a50362b Working impl of log reg
+* 1c43884 Write unit tests for log reg
+* 5249f09 Implement logistic regression
+* 99b04d9 Update docstrings
+* 06925ea Update version
+* e44d406 Correct linear regression impl
+* 469f3b8 Use advertising dataset for lin reg example
+* a66d684 Re-write lin reg example
+* 7c82ac4 Refactor API
+* 9f83053 Update version
+* 2fdc0b8 Update Readme
+* bc1f211 Add license
+* c0a84ff Add docstring for logistic regression
+* be1111a Begin Log regression impl
+* 440557a Refactor profiler structure, update docs
+* 3a4164d Refine project structure
+* 15c96f4 Implement a profiler
+* 4b7bf00 Remove external repo
+* 699b499 Refactor API
+* f518508 Update Readme
+* f237ec0 Restructure and impl linear reg
+* 4b97055 Change Readme
+* fe77d7d Remove unused imports
+* e6373cb Fix conflicts
+* aff18b3 Initial commit
