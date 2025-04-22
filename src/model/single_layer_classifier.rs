@@ -7,7 +7,7 @@ use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::prelude::single_layer_classifier::SingleLayerClassifierBuilder;
 use crate::prelude::*;
-use ndarray::{Array1, ArrayView, Dimension, arr1, arr2};
+use ndarray::{Array1, ArrayView, Axis, Dimension, arr1, arr2};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
 use uuid::Uuid;
@@ -159,6 +159,16 @@ impl SingleLayerClassifier {
         }
     }
 
+    /// Computes the derivative of the activation function for a given input z.
+    pub fn compute_derivative(&self, z: &Matrix, activation_fn: ActivationFn) -> Matrix {
+        match activation_fn {
+            ActivationFn::Sigmoid => Sigmoid::derivative(z),
+            ActivationFn::ReLU => ReLU::derivative(z),
+            ActivationFn::Tanh => Tanh::derivative(z),
+            ActivationFn::LeakyReLU => LeakyReLU::derivative(z),
+        }
+    }
+
     /// Computes the linear activation for a given input x, weights w, and bias b.
     /// Given the following dimensions:
     /// * x: (n_features, m)
@@ -191,12 +201,29 @@ impl SingleLayerClassifier {
     pub fn set_cache(&mut self, cache: SingleLayerClassifierCache) {
         self.cache = Some(cache);
     }
+
+    pub fn generate_cache(&mut self, n_samples: usize) -> Result<(), ModelError> {
+        let n_hidden = self.w1.shape()[0];
+        let n_output = self.w2.shape()[0];
+
+        // Create cache with initialized matrices
+        let cache = SingleLayerClassifierCache {
+            z1: Some(Matrix::zeros((n_hidden, n_samples))),
+            a1: Some(Matrix::zeros((n_hidden, n_samples))),
+            z2: Some(Matrix::zeros((n_output, n_samples))),
+            a2: Some(Matrix::zeros((n_output, n_samples))),
+            cache_id: Some(Uuid::new_v4()),
+        };
+        self.set_cache(cache);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests_single_layer_classifier {
     use crate::builders::builder::Builder;
+
+    use super::*;
 
     #[test]
     fn test_new_valid_parameters() {
@@ -272,6 +299,52 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
         assert_eq!(output.shape(), &[10, 2]);
+    }
+
+    #[test]
+    fn test_generate_cache() {
+        // Create classifier with 2 features and 3 hidden nodes
+        let mut classifier = SingleLayerClassifier::new(
+            2,   // features
+            3,   // hidden nodes
+            0.5, // threshold
+            ActivationFn::Sigmoid,
+            ActivationFn::ReLU,
+        )
+        .unwrap();
+
+        // Input with 2 features and 4 samples
+        let x = Matrix::from_shape_vec((2, 4), vec![0.1; 8]).unwrap();
+
+        // Initially, cache should be None
+        assert!(classifier.cache.is_none());
+        assert!(classifier.current_cache_id.is_none());
+
+        // Generate cache
+        let result = classifier.generate_cache(x.shape()[1]);
+        assert!(result.is_ok());
+
+        // Cache should now exist
+        assert!(classifier.cache.is_some());
+
+        // Check cache has the correct dimensions
+        if let Some(ref cache) = classifier.cache {
+            // z1 and a1 should be (hidden_nodes × samples)
+            assert!(cache.z1.is_some());
+            assert_eq!(cache.z1.as_ref().unwrap().shape(), &[3, 4]);
+
+            assert!(cache.a1.is_some());
+            assert_eq!(cache.a1.as_ref().unwrap().shape(), &[3, 4]);
+
+            // z2 and a2 should be (output_nodes × samples)
+            assert!(cache.z2.is_some());
+            assert_eq!(cache.z2.as_ref().unwrap().shape(), &[1, 4]);
+
+            assert!(cache.a2.is_some());
+            assert_eq!(cache.a2.as_ref().unwrap().shape(), &[1, 4]);
+        } else {
+            panic!("Cache should exist after generate_cache call");
+        }
     }
 }
 
@@ -358,19 +431,17 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
         let y = y.ok_or(ModelError::InvalidParameter(
             "Output data is required for initialization".to_string(),
         ))?;
+        // Get number of samples
         let m = x.shape()[1];
-        let z1 = Matrix::zeros((self.w1.shape()[0], m));
-        let a1 = Matrix::zeros((self.w1.shape()[0], m));
-        let z2 = Matrix::zeros((self.w2.shape()[0], m));
-        let a2 = Matrix::zeros((self.w2.shape()[0], m));
-        let cache = SingleLayerClassifierCache {
-            a1: Some(a1),
-            z1: Some(z1),
-            a2: Some(a2),
-            z2: Some(z2),
-            cache_id: None,
-        };
-        self.set_cache(cache);
+
+        // Generate cache and propagate any errors
+        if let Err(e) = self.generate_cache(m) {
+            return Err(ModelError::CacheError(format!(
+                "Failed to generate model cache: {}",
+                e
+            )));
+        }
+
         Ok(())
     }
 }
@@ -820,12 +891,67 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         Ok(a2)
     }
 
-    fn backward(&mut self, _: &Matrix, _: &Matrix) -> Result<(), ModelError> {
+    /// Inputs the output gradient from the last layer with respect to the last layer's
+    /// linear term z2, and computes the gradients of the loss function with respect to
+    /// the weights and biases of the model.
+    fn backward(&mut self, x: &Matrix, output_grad: &Matrix) -> Result<(), ModelError> {
+        // Get cache
+        let cache = self
+            .cache()
+            .ok_or(ModelError::CacheError("Cache is not set".to_string()))?;
+        // Extract necessary items from cache
+        let a2 = cache.a2.as_ref().ok_or(ModelError::CacheError(
+            "Cache does not contain a2".to_string(),
+        ))?;
+        let z1 = cache.z1.as_ref().ok_or(ModelError::CacheError(
+            "Cache does not contain z1".to_string(),
+        ))?;
+
+        // Get sample size
+        let m = x.shape()[1] as f64;
+
+        // Compute gradients
+        let dz2 = output_grad;
+        let dw2 = dz2.dot(&a2.t()) / m;
+        let db2 = dz2.sum_axis(Axis(1)) / m;
+        let dz1 =
+            self.w2.t().dot(dz2) * self.compute_derivative(z1, self.hidden_layer_activation_fn);
+        let dw1 = dz1.dot(&x.t()) / m;
+        let db1 = dz1.sum_axis(Axis(1)) / m;
+
+        // Store gradients in gradient collection
+        self.set_gradient("w1", dw1.view())?;
+        self.set_gradient("b1", db1.view())?;
+        self.set_gradient("w2", dw2.view())?;
+        self.set_gradient("b2", db2.view())?;
+
         Ok(())
     }
 
-    fn compute_output_gradient(&mut self, _: &Matrix, _: &Matrix) -> Result<Matrix, ModelError> {
-        Ok(arr2(&[[0.0]]))
+    /// The compute output gradient function returns the gradient of the output layer
+    /// with respect to the last layer's linear term. It serves as the starting point for
+    /// backward propagation.
+    fn compute_output_gradient(&mut self, x: &Matrix, y: &Matrix) -> Result<Matrix, ModelError> {
+        let a2: Matrix;
+        if self.cache.is_none() {
+            // Perform forward pass to get predictions
+            a2 = self.forward(x)?;
+        } else {
+            a2 = self.cache().unwrap().a2.clone().unwrap();
+        }
+        let cache = self
+            .cache()
+            .ok_or(ModelError::InvalidParameter("Cache is not set".to_string()))?;
+
+        // Check cache
+        if self.current_cache_id != cache.cache_id {
+            return Err(ModelError::InvalidParameter(
+                "Cache ID does not match".to_string(),
+            ));
+        }
+        // Extract the last activation from the cache
+        let dz = a2 - y;
+        Ok(dz)
     }
 }
 
@@ -833,6 +959,97 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
 mod optimizable_model_tests {
     use super::*;
     use approx::assert_relative_eq;
+
+    #[test]
+    fn test_compute_output_gradient_dimensions() {
+        // Create classifier with 2 features and 3 hidden nodes
+        let mut classifier =
+            SingleLayerClassifier::new(2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
+                .unwrap();
+
+        // Create input with 2 features and 5 samples
+        let x = Matrix::from_shape_vec((2, 5), vec![0.1; 10]).unwrap();
+
+        // Create target outputs for 5 samples
+        let y = Matrix::from_shape_vec((1, 5), vec![0.0, 1.0, 0.0, 1.0, 0.0]).unwrap();
+
+        // Do forward pass to initialize cache
+        let a2 = classifier.forward(&x).unwrap();
+
+        // Set cache_id to match current_cache_id for test
+        if let Some(ref mut cache) = classifier.cache {
+            classifier.current_cache_id = cache.cache_id;
+        }
+
+        // Compute output gradient
+        let grad = classifier.compute_output_gradient(&x, &y);
+
+        // Check that gradient computation succeeds
+        assert!(grad.is_ok());
+
+        // Check dimensions of gradient
+        let grad = grad.unwrap();
+        assert_eq!(grad.shape(), &[1, 5]);
+    }
+
+    #[test]
+    fn test_compute_output_gradient_values() {
+        // Create classifier with controlled weights
+        let mut classifier =
+            SingleLayerClassifier::new(2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
+                .unwrap();
+
+        // Create simple test case with 1 sample
+        let x = Matrix::from_shape_vec((2, 1), vec![1.0, 2.0]).unwrap();
+        let y = Matrix::from_shape_vec((1, 1), vec![1.0]).unwrap();
+
+        // Do forward pass with known output
+        let a2 = classifier.forward(&x).unwrap();
+
+        // Set cache_id to match current_cache_id for test
+        if let Some(ref mut cache) = classifier.cache {
+            classifier.current_cache_id = cache.cache_id;
+        }
+
+        // Compute output gradient
+        let grad = classifier.compute_output_gradient(&x, &y).unwrap();
+
+        // Gradient should be (a2 - y)
+        let expected_grad = &a2 - &y;
+
+        // Check that the computed gradient matches the expected gradient
+        assert_eq!(grad, expected_grad);
+    }
+
+    #[test]
+    fn test_compute_output_gradient_cache_validation() {
+        // Create classifier
+        let mut classifier =
+            SingleLayerClassifier::new(2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
+                .unwrap();
+
+        // Create test data
+        let x = Matrix::from_shape_vec((2, 2), vec![0.1, 0.2, 0.3, 0.4]).unwrap();
+        let y = Matrix::from_shape_vec((1, 2), vec![0.0, 1.0]).unwrap();
+
+        // Do forward pass to initialize cache
+        let _ = classifier.forward(&x).unwrap();
+
+        // Intentionally mismatch the cache ID
+        if let Some(ref mut cache) = classifier.cache {
+            classifier.current_cache_id = Some(Uuid::new_v4()); // Different UUID
+        }
+
+        // Compute output gradient should fail with cache mismatch
+        let result = classifier.compute_output_gradient(&x, &y);
+        assert!(result.is_err());
+
+        if let Err(ModelError::InvalidParameter(msg)) = result {
+            assert!(msg.contains("Cache ID does not match"));
+        } else {
+            panic!("Expected InvalidParameter error about cache ID mismatch");
+        }
+    }
 
     #[test]
     fn test_forward_dimensions() {
@@ -910,9 +1127,6 @@ mod optimizable_model_tests {
 
         let result = classifier.forward(&input);
         assert!(result.is_ok());
-
-        // With different activation functions, the result will differ
-        // This test checks that the forward function runs successfully with various activation functions
     }
 
     #[test]
