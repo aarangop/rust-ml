@@ -105,3 +105,51 @@ impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
         Ok(())
     }
 }
+
+impl<M: OptimizableModel<Matrix, Matrix>> Optimizer<Matrix, Matrix, M>
+    for GradientDescent<Matrix, Matrix, M>
+{
+    /// Fits the model to the training data using gradient descent algorithm.
+    ///
+    /// This method updates the model parameters by computing gradients
+    /// and adjusting the parameters in the direction that minimizes the cost function.
+    ///
+    /// # Arguments
+    /// * `model` - The machine learning model to optimize
+    /// * `x` - The input training data
+    /// * `y` - The expected output values
+    ///
+    /// # Returns
+    /// * `Ok(())` if optim completes successfully
+    /// * `Err(ModelError)` if an error occurs during optim
+    fn fit(&mut self, model: &mut M, x: &Matrix, y: &Matrix) -> Result<(), ModelError> {
+        if let Some(callback) = self.init_callback {
+            callback(format!(
+                "Initializing Gradient Descent with learning rate: {} and epochs: {}",
+                self.learning_rate, self.epochs
+            ));
+        }
+        for i in 0..self.epochs {
+            // Compute cost
+            let cost = model.compute_cost(x, y)?;
+
+            self.cost_history.push(cost);
+
+            // Compute output gradient (includes forward prop)
+            let output_gradient = model.compute_output_gradient(x, y)?;
+
+            // Compute gradients using backward propagation
+            model.backward(x, &output_gradient)?;
+
+            // Update model parameters using optimizer state
+            self.state.update_weights(model)?;
+
+            // Call progress callback if provided
+            if let Some(callback) = self.progress_callback {
+                let perc = (i as f64 + 1.0 / self.epochs as f64) * 100.0;
+                callback(i + 1, perc, cost);
+            }
+        }
+        Ok(())
+    }
+}
