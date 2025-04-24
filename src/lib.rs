@@ -4,6 +4,7 @@ pub mod core;
 pub mod model;
 pub mod optim;
 pub mod utils;
+pub mod vis;
 
 /// The prelude module provides convenient imports of common components.
 ///
