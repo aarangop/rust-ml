@@ -12,6 +12,8 @@ use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
 use uuid::Uuid;
 
+use super::core::classification_model::ClassificationModel;
+
 /// Cache for storing intermediate values during forward pass.
 #[derive(Debug, Clone)]
 pub struct SingleLayerClassifierCache {
@@ -41,14 +43,23 @@ pub struct SingleLayerClassifierCache {
 /// * `threshold` - Classification threshold for binary classification
 #[derive(Debug, Clone)]
 pub struct SingleLayerClassifier {
+    /// Weight matrix between input and hidden layer.
     pub w1: Matrix,
+    /// Bias vector for hidden layer.
     pub b1: Vector,
+    /// Weight matrix between hidden and output layer.
     pub w2: Matrix,
+    /// Bias vector for output layer.
     pub b2: Vector,
+    /// Activation function applied to the output layer.
     output_layer_activation_fn: ActivationFn,
+    /// Activation function applied to the hidden layer.
     hidden_layer_activation_fn: ActivationFn,
+    /// Classification threshold for binary classification.
     threshold: f64,
+    /// Cache for storing intermediate values during forward pass.
     cache: Option<SingleLayerClassifierCache>,
+    /// Current cache ID for validation.
     current_cache_id: Option<Uuid>,
 }
 
@@ -150,6 +161,13 @@ impl SingleLayerClassifier {
     }
 
     /// Returns the activation for a given input z.
+    ///
+    /// # Parameters
+    /// * `z` - Input matrix for which the activation function is applied.
+    /// * `activation_fn` - The activation function to use (e.g., Sigmoid, ReLU).
+    ///
+    /// # Returns
+    /// A matrix with the activation function applied element-wise.
     pub fn compute_activation(&self, z: &Matrix, activation_fn: ActivationFn) -> Matrix {
         match activation_fn {
             ActivationFn::Sigmoid => Sigmoid::activate(z),
@@ -160,6 +178,13 @@ impl SingleLayerClassifier {
     }
 
     /// Computes the derivative of the activation function for a given input z.
+    ///
+    /// # Parameters
+    /// * `z` - Input matrix for which the derivative of the activation function is computed.
+    /// * `activation_fn` - The activation function to use (e.g., Sigmoid, ReLU).
+    ///
+    /// # Returns
+    /// A matrix with the derivative of the activation function applied element-wise.
     pub fn compute_derivative(&self, z: &Matrix, activation_fn: ActivationFn) -> Matrix {
         match activation_fn {
             ActivationFn::Sigmoid => Sigmoid::derivative(z),
@@ -170,14 +195,17 @@ impl SingleLayerClassifier {
     }
 
     /// Computes the linear activation for a given input x, weights w, and bias b.
-    /// Given the following dimensions:
-    /// * x: (n_features, m)
-    /// * w: (n_nodes, n_features)
-    /// * b: (n_nodes)
     ///
-    /// The dimensions of the output will be:
+    /// # Parameters
+    /// * `x` - Input feature matrix where each column represents a sample.
+    /// * `w` - Weight matrix.
+    /// * `b` - Bias vector.
     ///
-    /// * (n_nodes, m)
+    /// # Returns
+    /// * `Result<Matrix, ModelError>` - The computed linear activation or an error.
+    ///
+    /// # Errors
+    /// Returns `ModelError::ShapeError` if broadcasting fails.
     pub fn compute_linear_activation(
         &self,
         x: &Matrix,
@@ -194,14 +222,29 @@ impl SingleLayerClassifier {
         Ok(z)
     }
 
+    /// Retrieves the current cache of the model.
+    ///
+    /// # Returns
+    /// An optional reference to the current cache.
     pub fn cache(&self) -> Option<&SingleLayerClassifierCache> {
         self.cache.as_ref()
     }
 
+    /// Sets the cache for the model.
+    ///
+    /// # Parameters
+    /// * `cache` - The cache to set.
     pub fn set_cache(&mut self, cache: SingleLayerClassifierCache) {
         self.cache = Some(cache);
     }
 
+    /// Generates a new cache for the model based on the number of samples.
+    ///
+    /// # Parameters
+    /// * `n_samples` - The number of samples in the input data.
+    ///
+    /// # Returns
+    /// * `Result<(), ModelError>` - Success or an error if cache creation fails.
     pub fn generate_cache(&mut self, n_samples: usize) -> Result<(), ModelError> {
         let n_hidden = self.w1.shape()[0];
         let n_output = self.w2.shape()[0];
@@ -423,13 +466,10 @@ impl BaseModel<Matrix, Matrix> for SingleLayerClassifier {
     fn initialize_model(
         &mut self,
         x: Option<&Matrix>,
-        y: Option<&Matrix>,
+        _: Option<&Matrix>,
     ) -> Result<(), ModelError> {
         let x = x.ok_or(ModelError::InvalidParameter(
             "Input data is required for initialization".to_string(),
-        ))?;
-        let y = y.ok_or(ModelError::InvalidParameter(
-            "Output data is required for initialization".to_string(),
         ))?;
         // Get number of samples
         let m = x.shape()[1];
@@ -899,6 +939,7 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         let cache = self
             .cache()
             .ok_or(ModelError::CacheError("Cache is not set".to_string()))?;
+
         // Extract necessary items from cache
         let a2 = cache.a2.as_ref().ok_or(ModelError::CacheError(
             "Cache does not contain a2".to_string(),
@@ -959,6 +1000,7 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
 mod optimizable_model_tests {
     use super::*;
     use approx::assert_relative_eq;
+    use ndarray::arr2;
 
     #[test]
     fn test_compute_output_gradient_dimensions() {
@@ -974,7 +1016,7 @@ mod optimizable_model_tests {
         let y = Matrix::from_shape_vec((1, 5), vec![0.0, 1.0, 0.0, 1.0, 0.0]).unwrap();
 
         // Do forward pass to initialize cache
-        let a2 = classifier.forward(&x).unwrap();
+        let _a2 = classifier.forward(&x).unwrap();
 
         // Set cache_id to match current_cache_id for test
         if let Some(ref mut cache) = classifier.cache {
@@ -1036,7 +1078,7 @@ mod optimizable_model_tests {
         let _ = classifier.forward(&x).unwrap();
 
         // Intentionally mismatch the cache ID
-        if let Some(ref mut cache) = classifier.cache {
+        if let Some(ref mut _cache) = classifier.cache {
             classifier.current_cache_id = Some(Uuid::new_v4()); // Different UUID
         }
 
@@ -1149,5 +1191,404 @@ mod optimizable_model_tests {
         for val in output.iter() {
             assert!(0.0 <= *val && *val <= 1.0);
         }
+    }
+}
+
+impl ClassificationModel<Matrix, Matrix> for SingleLayerClassifier {
+    fn accuracy(&mut self, x: &Matrix, y: &Matrix) -> Result<f64, ModelError> {
+        // Make predictions
+        let y_pred = self.predict(x)?;
+        
+        // Check dimensions
+        if y.shape() != y_pred.shape() {
+            return Err(ModelError::ShapeError(format!(
+                "Target shape {:?} doesn't match predictions shape {:?}",
+                y.shape(),
+                y_pred.shape()
+            )));
+        }
+        
+        // Calculate accuracy: correct predictions / total predictions
+        let total_samples = y.len() as f64;
+        let correct_predictions = (y_pred.iter().zip(y.iter()))
+            .filter(|(pred, actual)| (**pred > 0.5 && **actual > 0.5) || (**pred <= 0.5 && **actual <= 0.5))
+            .count() as f64; 
+        Ok(correct_predictions / total_samples)
+    }
+    
+    fn loss(&mut self, x: &Matrix, y: &Matrix) -> Result<f64, ModelError> {
+        // For classification, loss is the same as compute_cost (binary cross-entropy)
+        self.compute_cost(x, y)
+    }
+    
+    fn recall(&mut self, x: &Matrix, y: &Matrix) -> Result<f64, ModelError> {
+        // Make predictions
+        let y_pred = self.predict(x)?;
+        
+        // Check dimensions
+        if y.shape() != y_pred.shape() {
+            return Err(ModelError::ShapeError(format!(
+                "Target shape {:?} doesn't match predictions shape {:?}",
+                y.shape(),
+                y_pred.shape()
+            )));
+        }
+        
+        // Calculate recall: true positives / (true positives + false negatives)
+        let true_positives = (y_pred.iter().zip(y.iter()))
+            .filter(|(pred, actual)| **pred > 0.5 && **actual > 0.5)
+            .count() as f64;
+            
+        let actual_positives = y.iter().filter(|&&actual| actual > 0.5).count() as f64;
+        
+        // Handle division by zero
+        if actual_positives == 0.0 {
+            return Ok(1.0); // By convention, when no actual positives exist
+        }
+        
+        Ok(true_positives / actual_positives)
+    }
+    
+    fn f1_score(&mut self, x: &Matrix, y: &Matrix) -> Result<f64, ModelError> {
+        // Make predictions
+        let y_pred = self.predict(x)?;
+        
+        // Check dimensions
+        if y.shape() != y_pred.shape() {
+            return Err(ModelError::ShapeError(format!(
+                "Target shape {:?} doesn't match predictions shape {:?}",
+                y.shape(),
+                y_pred.shape()
+            )));
+        }
+        
+        // Calculate precision and recall
+        let true_positives = (y_pred.iter().zip(y.iter()))
+            .filter(|(pred, actual)| **pred > 0.5 && **actual > 0.5)
+            .count() as f64;
+            
+        let predicted_positives = y_pred.iter().filter(|&&pred| pred > 0.5).count() as f64;
+        let actual_positives = y.iter().filter(|&&actual| actual > 0.5).count() as f64;
+        
+        // Handle division by zero cases
+        if predicted_positives == 0.0 && actual_positives == 0.0 {
+            return Ok(1.0); // Perfect agreement when no positives exist
+        }
+        
+        if predicted_positives == 0.0 || actual_positives == 0.0 {
+            return Ok(0.0); // No overlap between predictions and actuals
+        }
+        
+        let precision = true_positives / predicted_positives;
+        let recall = true_positives / actual_positives;
+        
+        // F1 = 2 * (precision * recall) / (precision + recall)
+        if precision + recall == 0.0 {
+            return Ok(0.0);
+        }
+        
+        Ok(2.0 * precision * recall / (precision + recall))
+    }
+    
+    fn compute_metrics(
+        &mut self,
+        x: &Matrix,
+        y: &Matrix,
+    ) -> Result<crate::bench::classification_metrics::ClassificationMetrics, ModelError> {
+        // Calculate all metrics
+        let accuracy = self.accuracy(x, y)?;
+        let loss = self.loss(x, y)?;
+        let recall = self.recall(x, y)?;
+        
+        // Make predictions for other metrics
+        let y_pred = self.predict(x)?;
+        
+        // Calculate precision
+        let true_positives = (y_pred.iter().zip(y.iter()))
+            .filter(|(pred, actual)| **pred > 0.5 && **actual > 0.5)
+            .count() as f64;
+        let predicted_positives = y_pred.iter().filter(|&&pred| pred > 0.5).count() as f64;
+        
+        let precision = if predicted_positives == 0.0 {
+            1.0 // By convention, when no predicted positives exist
+        } else {
+            true_positives / predicted_positives
+        };
+        
+        // Calculate f1 (using previously computed precision and recall)
+        let f1 = if precision + recall == 0.0 {
+            0.0
+        } else {
+            2.0 * precision * recall / (precision + recall)
+        };
+        
+        // Create and return the metrics struct
+        Ok(crate::bench::classification_metrics::ClassificationMetrics {
+            accuracy,
+            loss,
+            precision,
+            recall,
+            f1_score: f1,
+        })
+    }
+}
+#[cfg(test)]
+mod classification_model_tests {
+    use approx::assert_relative_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_accuracy_perfect_predictions() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Setup model with predetermined weights for deterministic output
+        classifier.w1 = Matrix::from_shape_vec((3, 2), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
+        classifier.b1 = Vector::from_vec(vec![0.1, 0.2, 0.3]);
+        classifier.w2 = Matrix::from_shape_vec((1, 3), vec![0.7, 0.8, 0.9]).unwrap();
+        classifier.b2 = Vector::from_vec(vec![0.1]);
+        
+        // Create predictions that match targets exactly
+        let x = Matrix::from_shape_vec((2, 3), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
+        
+        // Forward propagate to get predictions
+        let preds = classifier.forward(&x).unwrap();
+        
+        // Set y to match predictions after thresholding
+        let y = preds.map(|&v| if v > 0.5 { 1.0 } else { 0.0 });
+        
+        // Calculate accuracy
+        let accuracy = classifier.accuracy(&x, &y).unwrap();
+        assert_relative_eq!(accuracy, 1.0);
+    }
+    
+    #[test]
+    fn test_accuracy_no_correct_predictions() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input and targets
+        let x = Matrix::from_shape_vec((2, 3), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
+        let y = Matrix::from_shape_vec((1, 3), vec![1.0, 1.0, 1.0]).unwrap();
+        
+        // Force predictions to be all zeros
+        classifier.w1 = Matrix::zeros((3, 2));
+        classifier.b1 = Vector::zeros(3);
+        classifier.w2 = Matrix::zeros((1, 3));
+        classifier.b2 = Vector::from_vec(vec![-10.0]);  // Large negative bias to ensure sigmoid output near 0
+        
+        // Calculate accuracy
+        let accuracy = classifier.accuracy(&x, &y).unwrap();
+        assert_relative_eq!(accuracy, 0.0);
+    }
+    
+    #[test]
+    fn test_accuracy_mixed_predictions() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input
+        let x = Matrix::from_shape_vec((2, 4), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]).unwrap();
+        
+        // Targets: [0, 1, 0, 1]
+        let y = Matrix::from_shape_vec((1, 4), vec![0.0, 1.0, 0.0, 1.0]).unwrap();
+        
+        // Configure model to get 75% accuracy (3/4 correct)
+        classifier.w1 = Matrix::zeros((3, 2));
+        classifier.b1 = Vector::zeros(3);
+        classifier.w2 = Matrix::zeros((1, 3));
+        
+        // Force predictions to be [0, 1, 1, 1] (matches y in 3 places)
+        let preds = arr2(&[[0.0, 1.0, 1.0, 1.0]]);
+        
+        // Mock the predict method
+        let _old_predict = classifier.predict(&x).unwrap();
+        let _ = classifier.predict(&x);
+        classifier.cache = Some(SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: Some(preds.clone()),
+            z2: None,
+            cache_id: Some(Uuid::new_v4()),
+        });
+        classifier.current_cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        
+        let accuracy = classifier.accuracy(&x, &y).unwrap();
+        assert_relative_eq!(accuracy, 0.75);
+    }
+    
+    #[test]
+    fn test_recall_perfect() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input
+        let x = Matrix::from_shape_vec((2, 3), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
+        
+        // Targets with positives (1.0)
+        let y = Matrix::from_shape_vec((1, 3), vec![0.0, 1.0, 1.0]).unwrap();
+        
+        // Mock predictions to match all positives
+        let preds = arr2(&[[0.0, 1.0, 1.0]]);
+        
+        let _ = classifier.predict(&x);
+        classifier.cache = Some(SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: Some(preds.clone()),
+            z2: None,
+            cache_id: Some(Uuid::new_v4()),
+        });
+        classifier.current_cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        
+        let recall = classifier.recall(&x, &y).unwrap();
+        assert_relative_eq!(recall, 1.0);
+    }
+    
+    #[test]
+    fn test_recall_zero() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input
+        let x = Matrix::from_shape_vec((2, 3), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
+        
+        // Targets with positives
+        let y = Matrix::from_shape_vec((1, 3), vec![0.0, 1.0, 1.0]).unwrap();
+        
+        // Mock predictions to miss all positives
+        let preds = arr2(&[[0.0, 0.0, 0.0]]);
+        
+        let _ = classifier.predict(&x);
+        classifier.cache = Some(SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: Some(preds.clone()),
+            z2: None,
+            cache_id: Some(Uuid::new_v4()),
+        });
+        classifier.current_cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        
+        let recall = classifier.recall(&x, &y).unwrap();
+        assert_relative_eq!(recall, 0.0);
+    }
+    
+    #[test]
+    fn test_recall_edge_case_no_actual_positives() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input
+        let x = Matrix::from_shape_vec((2, 3), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]).unwrap();
+        
+        // Targets with no positives
+        let y = Matrix::from_shape_vec((1, 3), vec![0.0, 0.0, 0.0]).unwrap();
+        
+        // Any predictions are fine
+        let preds = arr2(&[[1.0, 0.0, 1.0]]);
+        
+        let _ = classifier.predict(&x);
+        classifier.cache = Some(SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: Some(preds.clone()),
+            z2: None,
+            cache_id: Some(Uuid::new_v4()),
+        });
+        classifier.current_cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        
+        let recall = classifier.recall(&x, &y).unwrap();
+        assert_relative_eq!(recall, 1.0); // By convention, recall is 1.0 when no actual positives
+    }
+    
+    #[test]
+    fn test_f1_score() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input
+        let x = Matrix::from_shape_vec((2, 4), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]).unwrap();
+        
+        // Targets: [0, 1, 0, 1]
+        let y = Matrix::from_shape_vec((1, 4), vec![0.0, 1.0, 0.0, 1.0]).unwrap();
+        
+        // Predictions: [0, 1, 1, 0]
+        // True positives: 1, False positives: 1, False negatives: 1
+        // Precision = 1/2 = 0.5, Recall = 1/2 = 0.5, F1 = 2*0.5*0.5/(0.5+0.5) = 0.5
+        let preds = arr2(&[[0.0, 1.0, 1.0, 0.0]]);
+        
+        let _ = classifier.predict(&x);
+        classifier.cache = Some(SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: Some(preds.clone()),
+            z2: None,
+            cache_id: Some(Uuid::new_v4()),
+        });
+        classifier.current_cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        
+        let f1 = classifier.f1_score(&x, &y).unwrap();
+        assert_relative_eq!(f1, 0.5);
+    }
+    
+    #[test]
+    fn test_compute_metrics() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input
+        let x = Matrix::from_shape_vec((2, 4), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]).unwrap();
+        
+        // Targets: [0, 1, 0, 1]
+        let y = Matrix::from_shape_vec((1, 4), vec![0.0, 1.0, 0.0, 1.0]).unwrap();
+        
+        // Predictions: [0, 1, 1, 0]
+        let preds = arr2(&[[0.0, 1.0, 1.0, 0.0]]);
+        
+        let _ = classifier.predict(&x);
+        classifier.cache = Some(SingleLayerClassifierCache {
+            a1: None,
+            z1: None,
+            a2: Some(preds.clone()),
+            z2: None,
+            cache_id: Some(Uuid::new_v4()),
+        });
+        classifier.current_cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        
+        let metrics = classifier.compute_metrics(&x, &y).unwrap();
+        
+        assert_relative_eq!(metrics.accuracy, 0.5);
+        assert_relative_eq!(metrics.precision, 0.5);
+        assert_relative_eq!(metrics.recall, 0.5);
+        assert_relative_eq!(metrics.f1_score, 0.5);
+    }
+    
+    #[test]
+    fn test_shape_error_handling() {
+        let mut classifier = SingleLayerClassifier::new(
+            2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU
+        ).unwrap();
+        
+        // Input with correct shape
+        let x = Matrix::from_shape_vec((2, 4), vec![0.1; 8]).unwrap();
+        
+        // Target with incorrect shape
+        let y = Matrix::from_shape_vec((2, 4), vec![0.0; 8]).unwrap();
+        
+        // All metrics should return shape errors
+        assert!(classifier.accuracy(&x, &y).is_err());
+        assert!(classifier.loss(&x, &y).is_err());
+        assert!(classifier.recall(&x, &y).is_err());
+        assert!(classifier.f1_score(&x, &y).is_err());
+        assert!(classifier.compute_metrics(&x, &y).is_err());
     }
 }
