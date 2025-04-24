@@ -5,7 +5,7 @@ use crate::core::types::{Matrix, Scalar, Vector};
 use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::model::core::regression_model::RegressionModel;
-use ndarray::{Array0, Array1, ArrayView, ArrayView0, ArrayView1};
+use ndarray::{Array, Array0, Array1, ArrayView, ArrayView0, ArrayView1};
 
 /// A Linear Regression model that fits the equation y = W.T @ x + b
 ///
@@ -129,7 +129,7 @@ impl GradientCollection for LinearRegression {
     fn set_gradient<D: ndarray::Dimension>(
         &mut self,
         key: &str,
-        value: ArrayView<f64, D>,
+        value: Array<f64, D>,
     ) -> Result<(), ModelError> {
         match key {
             "weights" => {
@@ -244,14 +244,12 @@ impl OptimizableModel<Matrix, Vector> for LinearRegression {
 
         // Compute weights grads dw
         let dw: Vector = input.dot(&output_grad.t()) / m;
-        let dw: ArrayView1<f64> = dw.view();
 
         // Compute bias grad db.
         // Mind that in linear regression db = dy = output_grad, and output_grad is a scalar
         // wrapped in a vector of size 1.
         let db = output_grad.sum() / m;
-        let binding = Scalar::from_elem((), db);
-        let db: ArrayView0<f64> = binding.view();
+        let db = Scalar::from_elem((), db);
 
         // Update gradients
         self.set_gradient("weights", dw)?;

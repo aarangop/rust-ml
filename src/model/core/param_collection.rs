@@ -1,5 +1,5 @@
 use crate::core::error::ModelError;
-use ndarray::{ArrayView, ArrayViewMut, Dimension, IxDyn};
+use ndarray::{Array, ArrayView, ArrayViewMut, Dimension, IxDyn};
 use std::fmt::Debug;
 
 /// Provides access to parameters.
@@ -24,6 +24,6 @@ pub trait GradientCollection {
     fn set_gradient<D: Dimension>(
         &mut self,
         key: &str,
-        value: ArrayView<f64, D>,
+        value: Array<f64, D>,
     ) -> Result<(), ModelError>;
 }

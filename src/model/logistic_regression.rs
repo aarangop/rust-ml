@@ -11,7 +11,7 @@ use crate::core::types::{Matrix, Vector};
 use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::classification_model::ClassificationModel;
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
-use ndarray::{ArrayView, ArrayViewMut, Dimension, IxDyn};
+use ndarray::{Array, Array1, ArrayView, ArrayViewMut, Dimension, IxDyn};
 
 /// A logistic regression model for binary classification.
 ///
@@ -163,7 +163,7 @@ impl GradientCollection for LogisticRegression {
     fn set_gradient<D: Dimension>(
         &mut self,
         key: &str,
-        value: ArrayView<f64, D>,
+        value: Array<f64, D>,
     ) -> Result<(), ModelError> {
         match key {
             "weights" => {
@@ -201,8 +201,8 @@ impl OptimizableModel<Matrix, Vector> for LogisticRegression {
         let db = dz.sum() / m;
 
         // Set the gradients
-        self.set_gradient("weights", dw.view())?;
-        self.set_gradient("bias", ArrayView::from(&[db]))?;
+        self.set_gradient("weights", dw)?;
+        self.set_gradient("bias", Array1::from_elem(1, db))?;
 
         Ok(())
     }

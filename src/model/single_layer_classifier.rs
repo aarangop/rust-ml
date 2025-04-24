@@ -7,7 +7,7 @@ use crate::model::core::base::{BaseModel, OptimizableModel};
 use crate::model::core::param_collection::{GradientCollection, ParamCollection};
 use crate::prelude::single_layer_classifier::SingleLayerClassifierBuilder;
 use crate::prelude::*;
-use ndarray::{Array1, ArrayView, Axis, Dimension, arr1, arr2};
+use ndarray::{Array, Array1, ArrayView, Axis, Dimension, arr1, arr2};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Normal;
 use uuid::Uuid;
@@ -51,6 +51,14 @@ pub struct SingleLayerClassifier {
     pub w2: Matrix,
     /// Bias vector for output layer.
     pub b2: Vector,
+    /// Gradient of the const with respect to w1.
+    dw1: Matrix,
+    /// Gradient of the const with respect to b1.
+    db1: Vector,
+    /// Gradient of the const with respect to w2.
+    dw2: Matrix,
+    /// Gradient of the const with respect to b2.
+    db2: Vector,
     /// Activation function applied to the output layer.
     output_layer_activation_fn: ActivationFn,
     /// Activation function applied to the hidden layer.
@@ -117,18 +125,30 @@ impl SingleLayerClassifier {
             ));
         }
 
-        // Initialize weights and biases using a normal distribution for weights, and zeros for biases
+        // Initialize a normal distribution for weights
         let distribution = Normal::new(0.0, 1.0).unwrap();
+
+        // Initialize weights and biases
         let w1 = Matrix::random((n_hidden_nodes, n_features), distribution);
         let b1 = Vector::zeros(n_hidden_nodes);
         let w2 = Matrix::random((1, n_hidden_nodes), distribution);
         let b2 = Vector::zeros(1);
+
+        // Initialize gradients to zeros
+        let dw1 = Matrix::zeros((n_hidden_nodes, n_features));
+        let db1 = Vector::zeros(n_hidden_nodes);
+        let dw2 = Matrix::zeros((1, n_hidden_nodes));
+        let db2 = Vector::zeros(1);
 
         Ok(Self {
             w1,
             b1,
             w2,
             b2,
+            dw1,
+            db1,
+            dw2,
+            db2,
             output_layer_activation_fn,
             hidden_layer_activation_fn,
             threshold,
@@ -808,23 +828,23 @@ impl GradientCollection for SingleLayerClassifier {
     fn set_gradient<D: Dimension>(
         &mut self,
         key: &str,
-        value: ArrayView<f64, D>,
+        value: Array<f64, D>,
     ) -> Result<(), ModelError> {
         match key {
             "w1" => {
-                self.w1.assign(&value.to_shape(self.w1.shape())?);
+                self.dw1.assign(&value.to_shape(self.w1.shape())?);
                 Ok(())
             }
             "b1" => {
-                self.b1.assign(&value.to_shape(self.b1.shape())?);
+                self.db1.assign(&value.to_shape(self.b1.shape())?);
                 Ok(())
             }
             "w2" => {
-                self.w2.assign(&value.to_shape(self.w2.shape())?);
+                self.dw2.assign(&value.to_shape(self.w2.shape())?);
                 Ok(())
             }
             "b2" => {
-                self.b2.assign(&value.to_shape(self.b2.shape())?);
+                self.db2.assign(&value.to_shape(self.b2.shape())?);
                 Ok(())
             }
             _ => Err(ModelError::InvalidParameter(format!(
@@ -868,20 +888,20 @@ mod gradient_collection_tests {
                 .unwrap();
 
         let new_w1_grad = Matrix::zeros((10, 4));
-        let result = classifier.set_gradient("w1", new_w1_grad.view());
+        let result = classifier.set_gradient("w1", new_w1_grad.clone());
         assert!(result.is_ok());
 
         let new_b1_grad = Vector::ones(10);
-        let result = classifier.set_gradient("b1", new_b1_grad.view());
+        let result = classifier.set_gradient("b1", new_b1_grad);
         assert!(result.is_ok());
 
         // Test with wrong shape
         let wrong_shape = Matrix::zeros((5, 5));
-        let result = classifier.set_gradient("w1", wrong_shape.view());
+        let result = classifier.set_gradient("w1", wrong_shape);
         assert!(result.is_err());
 
         // Test with invalid key
-        let invalid = classifier.set_gradient("invalid", new_w1_grad.view());
+        let invalid = classifier.set_gradient("invalid", new_w1_grad);
         assert!(invalid.is_err());
     }
 
@@ -898,7 +918,7 @@ mod gradient_collection_tests {
 
         // Test setting with dynamic dimensions
         let new_b2_grad = Array::ones(ndarray::IxDyn(&[10]));
-        let result = classifier.set_gradient("b2", new_b2_grad.view());
+        let result = classifier.set_gradient("b2", new_b2_grad);
         assert!(result.is_ok());
     }
 }
@@ -919,14 +939,16 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         let z2 = self.compute_linear_activation(&a1, &self.w2, &self.b2)?;
         let a2 = self.compute_activation(&z2, self.output_layer_activation_fn);
         // Create new cache
+        let cache_id = Uuid::new_v4();
         let cache = SingleLayerClassifierCache {
             a1: Some(a1),
             z1: Some(z1),
             a2: Some(a2.clone()), // Changed from Some(&a2) to avoid lifetime issues
             z2: Some(z2),
-            cache_id: Some(Uuid::new_v4()),
+            cache_id: Some(cache_id.clone()),
         };
         self.set_cache(cache);
+        self.current_cache_id = Some(cache_id);
         // a2 is the output of the model
         Ok(a2)
     }
@@ -941,11 +963,11 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
             .ok_or(ModelError::CacheError("Cache is not set".to_string()))?;
 
         // Extract necessary items from cache
-        let a2 = cache.a2.as_ref().ok_or(ModelError::CacheError(
-            "Cache does not contain a2".to_string(),
-        ))?;
         let z1 = cache.z1.as_ref().ok_or(ModelError::CacheError(
             "Cache does not contain z1".to_string(),
+        ))?;
+        let a1 = cache.a1.as_ref().ok_or(ModelError::CacheError(
+            "Cache does not contain a1".to_string(),
         ))?;
 
         // Get sample size
@@ -953,7 +975,7 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
 
         // Compute gradients
         let dz2 = output_grad;
-        let dw2 = dz2.dot(&a2.t()) / m;
+        let dw2 = dz2.dot(&a1.t()) / m;
         let db2 = dz2.sum_axis(Axis(1)) / m;
         let dz1 =
             self.w2.t().dot(dz2) * self.compute_derivative(z1, self.hidden_layer_activation_fn);
@@ -961,10 +983,10 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         let db1 = dz1.sum_axis(Axis(1)) / m;
 
         // Store gradients in gradient collection
-        self.set_gradient("w1", dw1.view())?;
-        self.set_gradient("b1", db1.view())?;
-        self.set_gradient("w2", dw2.view())?;
-        self.set_gradient("b2", db2.view())?;
+        self.set_gradient("w1", dw1)?;
+        self.set_gradient("b1", db1)?;
+        self.set_gradient("w2", dw2)?;
+        self.set_gradient("b2", db2)?;
 
         Ok(())
     }
@@ -982,11 +1004,11 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
         }
         let cache = self
             .cache()
-            .ok_or(ModelError::InvalidParameter("Cache is not set".to_string()))?;
+            .ok_or(ModelError::CacheError("Cache is not set".to_string()))?;
 
         // Check cache
         if self.current_cache_id != cache.cache_id {
-            return Err(ModelError::InvalidParameter(
+            return Err(ModelError::CacheError(
                 "Cache ID does not match".to_string(),
             ));
         }
@@ -1000,7 +1022,7 @@ impl OptimizableModel<Matrix, Matrix> for SingleLayerClassifier {
 mod optimizable_model_tests {
     use super::*;
     use approx::assert_relative_eq;
-    use ndarray::arr2;
+    use ndarray::Ix2;
 
     #[test]
     fn test_compute_output_gradient_dimensions() {
@@ -1191,6 +1213,256 @@ mod optimizable_model_tests {
         for val in output.iter() {
             assert!(0.0 <= *val && *val <= 1.0);
         }
+    }
+
+    #[test]
+    fn test_forward_creates_new_cache() {
+        // Create classifier
+        let mut classifier = SingleLayerClassifier::new(
+            2, // 2 features
+            3, // 3 hidden nodes
+            0.5,
+            ActivationFn::Sigmoid,
+            ActivationFn::ReLU,
+        )
+        .unwrap();
+
+        // Input data
+        let input = Matrix::from_shape_vec((2, 2), vec![0.1, 0.2, 0.3, 0.4]).unwrap();
+
+        // Initially, no cache should exist
+        assert!(classifier.cache.is_none());
+        assert!(classifier.current_cache_id.is_none());
+
+        // Perform forward pass
+        let _ = classifier.forward(&input).unwrap();
+
+        // Now cache should exist
+        assert!(classifier.cache.is_some());
+
+        // Cache should have a valid ID
+        let cache_id = classifier.cache.as_ref().unwrap().cache_id;
+        assert!(cache_id.is_some());
+
+        // Store the first cache ID
+        let first_cache_id = cache_id.unwrap();
+
+        // Perform another forward pass
+        let _ = classifier.forward(&input).unwrap();
+
+        // Cache should still exist
+        assert!(classifier.cache.is_some());
+
+        // Cache should have a new ID after the second forward pass
+        let new_cache_id = classifier.cache.as_ref().unwrap().cache_id.unwrap();
+
+        // The new cache ID should be different from the first one
+        assert_ne!(first_cache_id, new_cache_id);
+    }
+
+    #[test]
+    fn test_forward_updates_current_cache_id() {
+        // Create classifier
+        let mut classifier = SingleLayerClassifier::new(
+            2, // 2 features
+            3, // 3 hidden nodes
+            0.5,
+            ActivationFn::Sigmoid,
+            ActivationFn::ReLU,
+        )
+        .unwrap();
+
+        // Input data
+        let input = Matrix::from_shape_vec((2, 2), vec![0.1, 0.2, 0.3, 0.4]).unwrap();
+
+        // Initially, current_cache_id should be None
+        assert!(classifier.current_cache_id.is_none());
+
+        // Perform forward pass
+        let _ = classifier.forward(&input).unwrap();
+
+        // Now cache should exist with a valid ID
+        assert!(classifier.cache.is_some());
+        let cache_id = classifier.cache.as_ref().unwrap().cache_id.unwrap();
+
+        // current_cache_id should be updated to match the cache's ID
+        assert!(classifier.current_cache_id.is_some());
+        assert_eq!(classifier.current_cache_id.unwrap(), cache_id);
+
+        // Perform another forward pass
+        let _ = classifier.forward(&input).unwrap();
+
+        // Cache ID should be updated
+        let new_cache_id = classifier.cache.as_ref().unwrap().cache_id.unwrap();
+
+        // current_cache_id should also be updated to match the new cache ID
+        assert_eq!(classifier.current_cache_id.unwrap(), new_cache_id);
+
+        // The IDs should be different from the first pass
+        assert_ne!(cache_id, new_cache_id);
+    }
+
+    #[test]
+    fn test_backward_dimensions() {
+        // Create classifier with 2 features and 3 hidden nodes
+        let mut classifier = SingleLayerClassifier::new(
+            2,   // 2 features
+            3,   // 3 hidden nodes
+            0.5, // threshold
+            ActivationFn::Sigmoid,
+            ActivationFn::ReLU,
+        )
+        .unwrap();
+
+        // Create input with 2 features and 4 samples
+        let x =
+            Matrix::from_shape_vec((2, 4), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]).unwrap();
+
+        // Do forward pass to initialize cache
+        let _ = classifier.forward(&x).unwrap();
+
+        // Create output gradient with correct dimensions
+        let output_grad = Matrix::from_shape_vec((1, 4), vec![0.1, -0.1, 0.2, -0.2]).unwrap();
+
+        // Run backward pass
+        let result = classifier.backward(&x, &output_grad);
+        assert!(result.is_ok());
+
+        // Verify gradient dimensions match parameter dimensions
+        let dw1 = classifier.get_gradient::<ndarray::Ix2>("w1").unwrap();
+        let db1 = classifier.get_gradient::<ndarray::Ix1>("b1").unwrap();
+        let dw2 = classifier.get_gradient::<ndarray::Ix2>("w2").unwrap();
+        let db2 = classifier.get_gradient::<ndarray::Ix1>("b2").unwrap();
+
+        assert_eq!(dw1.shape(), classifier.w1.shape());
+        assert_eq!(db1.shape(), classifier.b1.shape());
+        assert_eq!(dw2.shape(), classifier.w2.shape());
+        assert_eq!(db2.shape(), classifier.b2.shape());
+    }
+
+    #[test]
+    fn test_backward_cache_required() {
+        // Create classifier
+        let mut classifier =
+            SingleLayerClassifier::new(2, 3, 0.5, ActivationFn::Sigmoid, ActivationFn::ReLU)
+                .unwrap();
+
+        // Input data
+        let x = Matrix::from_shape_vec((2, 2), vec![0.1, 0.2, 0.3, 0.4]).unwrap();
+
+        // Output gradient
+        let output_grad = Matrix::from_shape_vec((1, 2), vec![0.1, -0.1]).unwrap();
+
+        // Without doing forward pass first, backward should fail
+        let result = classifier.backward(&x, &output_grad);
+        assert!(result.is_err());
+
+        if let Err(ModelError::CacheError(_)) = result {
+            // Good, we expected this error
+        } else {
+            panic!("Expected CacheError, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_backward_for_simple_case() {
+        // Create classifier with controlled weights
+        let mut classifier = SingleLayerClassifier::new(
+            1, // 1 feature for simplicity
+            1, // 1 hidden node
+            0.5,
+            ActivationFn::Sigmoid,
+            ActivationFn::ReLU,
+        )
+        .unwrap();
+
+        // Set predetermined weights
+        classifier.w1 = arr2(&[[1.0]]);
+        classifier.b1 = arr1(&[0.0]);
+        classifier.w2 = arr2(&[[1.0]]);
+        classifier.b2 = arr1(&[0.0]);
+
+        // Single sample with one feature
+        let x = arr2(&[[2.0]]);
+
+        // Perform forward pass to initialize cache
+        let _ = classifier.forward(&x).unwrap();
+
+        // Create simple output gradient
+        let output_grad = arr2(&[[1.0]]); // dL/da2 = 1.0
+
+        // Run backward pass
+        let result = classifier.backward(&x, &output_grad);
+        assert!(result.is_ok());
+
+        // Check that gradients exist and have non-zero values
+        let dw1 = classifier.get_gradient::<ndarray::Ix2>("w1").unwrap();
+        let db1 = classifier.get_gradient::<ndarray::Ix1>("b1").unwrap();
+        let dw2 = classifier.get_gradient::<ndarray::Ix2>("w2").unwrap();
+        let db2 = classifier.get_gradient::<ndarray::Ix1>("b2").unwrap();
+
+        // Gradients should be non-zero
+        assert!(dw1[[0, 0]] != 0.0);
+        assert!(db1[0] != 0.0);
+        assert!(dw2[[0, 0]] != 0.0);
+        assert!(db2[0] != 0.0);
+    }
+
+    #[test]
+    fn test_gradient_computation_with_expected_value() {
+        // Create a very simple classifier for deterministic testing
+        let mut classifier = SingleLayerClassifier::new(
+            1, // 1 feature
+            1, // 1 hidden node
+            0.5,
+            ActivationFn::Sigmoid,
+            ActivationFn::Sigmoid, // Use sigmoid for both to simplify manual calculations
+        )
+        .unwrap();
+
+        // Set deterministic weights and biases
+        classifier.w1 = arr2(&[[1.0]]);
+        classifier.b1 = arr1(&[0.0]);
+        classifier.w2 = arr2(&[[1.0]]);
+        classifier.b2 = arr1(&[0.0]);
+
+        // Single sample
+        let x = arr2(&[[1.0]]);
+        let y = arr2(&[[1.0]]);
+
+        // Forward pass
+        let _ = classifier.forward(&x).unwrap();
+
+        // Compute output gradient
+        let output_grad = classifier.compute_output_gradient(&x, &y).unwrap();
+
+        // Manual calculation:
+        // For a simple neural network with sigmoid activations:
+        // z1 = w1*x + b1 = 1*1 + 0 = 1
+        // a1 = sigmoid(z1) = 1/(1+e^-1) ≈ 0.731
+        // z2 = w2*a1 + b2 = 1*0.731 + 0 = 0.731
+        // a2 = sigmoid(z2) = 1/(1+e^-0.731) ≈ 0.675
+        // dz2 = a2 - y = 0.675 - 1 = -0.325
+
+        // Check output gradient value (dz2)
+        let expected_dz2 = -0.325; // approximately
+        assert_relative_eq!(output_grad[[0, 0]], expected_dz2, epsilon = 0.01);
+
+        // Compute gradients
+        let _ = classifier.backward(&x, &output_grad).unwrap();
+
+        // Get gradients
+        let dw2 = classifier.get_gradient::<ndarray::Ix2>("w2").unwrap();
+        let db2 = classifier.get_gradient::<ndarray::Ix1>("b2").unwrap();
+
+        // For a single sample, m=1:
+        // dw2 = dz2 * a1 / m = -0.325 * 0.731 / 1 ≈ -0.238
+        // db2 = dz2 / m = -0.325 / 1 = -0.325
+        let expected_dw2 = -0.238; // approximately
+        let expected_db2 = -0.325; // approximately
+
+        assert_relative_eq!(dw2[[0, 0]], expected_dw2, epsilon = 0.01);
+        assert_relative_eq!(db2[0], expected_db2, epsilon = 0.01);
     }
 }
 
