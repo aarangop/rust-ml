@@ -1,13 +1,22 @@
 use std::path::PathBuf;
 
-use ndarray::Axis;
+use ndarray::{Array2, Axis};
 use polars::{
     error::PolarsError,
     prelude::{Float64Type, IndexOrder},
 };
-use rust_ml::optim::sgd::optimizer::GradientDescent;
-use rust_ml::prelude::{Matrix, SingleLayerClassifier};
-use rust_ml::utils::data::{load_dataset, shuffle_split};
+use rust_ml::{
+    bench::classification_profiler::ClassificationProfiler, bench::core::profiler::Profiler,
+    builders::builder::Builder, optim::sgd::optimizer::GradientDescent, prelude::ActivationFn,
+};
+use rust_ml::{
+    prelude::Matrix,
+    utils::data::{load_dataset, shuffle_split},
+};
+use rust_ml::{
+    prelude::SingleLayerClassifier,
+    vis::progress_bar::{init_progress_bar, progress_bar_callback},
+};
 
 type GD = GradientDescent<Matrix, Matrix, SingleLayerClassifier>;
 /// In this example, we will try using the SingleLayerClassifier
@@ -45,10 +54,43 @@ fn main() -> Result<(), PolarsError> {
     let features = (&features - &mean) / &std;
 
     // Create train and test sets.
-    // let (x_train, y_train, x_test, y_test) = shuffle_split(&features, &target, 0.8, 42);
+    let (x_train, y_train, x_test, y_test) = shuffle_split(&features, &target, 0.8, 42);
+
+    // Reshape the data to match what the model expects
+    let x_train = x_train.t().to_owned();
+    let x_test = x_test.t().to_owned();
+    let y_train = y_train.to_shape((1, y_train.len())).unwrap().to_owned();
+    let _y_test = y_test.to_shape((1, y_test.len())).unwrap().to_owned();
+
+    // Print the shapes of the training and testing sets
+    println!("Training set shape: {:?}", x_train.shape());
+    println!("Testing set shape: {:?}", x_test.shape());
+    println!("Training target shape: {:?}", y_train.shape());
+    println!("Testing target shape: {:?}", _y_test.shape());
 
     // Initialize the optimizer
-    let gd: GD = GradientDescent::new(0.01, 1000);
+    let epochs = 1000;
+    let mut gd: GD = GradientDescent::new(0.01, epochs, None, Some(progress_bar_callback));
+
+    // Initialize the progress bar
+    init_progress_bar(epochs);
+
+    // Initialize the model
+    let mut model = SingleLayerClassifier::builder()
+        .n_features(x_train.shape()[0])
+        .n_hidden_nodes(10)
+        .hidden_layer_activation_fn(ActivationFn::ReLU)
+        .output_layer_activation_fn(ActivationFn::Sigmoid)
+        .build()
+        .unwrap();
+
+    // Initialize a profiler
+    let profiler: ClassificationProfiler<SingleLayerClassifier, GD, Array2<f64>, Array2<f64>> =
+        ClassificationProfiler::new();
+
+    let (_training_metrics, _eval_metrics) = profiler
+        .train(&mut model, &mut gd, &x_train, &y_train)
+        .unwrap();
 
     Ok(())
 }

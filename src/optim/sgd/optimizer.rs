@@ -9,6 +9,9 @@ use crate::model::core::base::OptimizableModel;
 use crate::optim::core::optimizer::Optimizer;
 use crate::optim::core::state::OptimizerState;
 use crate::optim::sgd::state::GradientDescentState;
+use crate::vis::progress_bar::ProgressBarCallback;
+
+pub type TrainingInitCallback = fn(msg: String);
 
 /// A standard gradient descent optimizer.
 ///
@@ -24,6 +27,9 @@ pub struct GradientDescent<Input, Output, M: OptimizableModel<Input, Output>> {
     epochs: usize,
     pub cost_history: Vec<f64>,
     state: GradientDescentState<Input, Output, M>,
+    init_callback: Option<TrainingInitCallback>,
+    progress_callback: Option<ProgressBarCallback>,
+    learning_rate: f64,
 }
 
 impl<Input, Output, M: OptimizableModel<Input, Output>> GradientDescent<Input, Output, M> {
@@ -35,11 +41,19 @@ impl<Input, Output, M: OptimizableModel<Input, Output>> GradientDescent<Input, O
     ///
     /// # Returns
     /// A new GradientDescent instance
-    pub fn new(learning_rate: f64, epochs: usize) -> Self {
+    pub fn new(
+        learning_rate: f64,
+        epochs: usize,
+        init_callback: Option<TrainingInitCallback>,
+        progress_callback: Option<ProgressBarCallback>,
+    ) -> Self {
         Self {
             epochs,
             cost_history: Vec::new(),
             state: GradientDescentState::new(learning_rate),
+            init_callback,
+            progress_callback,
+            learning_rate,
         }
     }
 }
@@ -61,7 +75,13 @@ impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
     /// * `Ok(())` if optim completes successfully
     /// * `Err(ModelError)` if an error occurs during optim
     fn fit(&mut self, model: &mut M, x: &Matrix, y: &Vector) -> Result<(), ModelError> {
-        for _ in 0..self.epochs {
+        if let Some(callback) = self.init_callback {
+            callback(format!(
+                "Initializing Gradient Descent with learning rate: {} and epochs: {}",
+                self.learning_rate, self.epochs
+            ));
+        }
+        for i in 0..self.epochs {
             // Compute cost
             let cost = model.compute_cost(x, y)?;
 
@@ -75,6 +95,12 @@ impl<M: OptimizableModel<Matrix, Vector>> Optimizer<Matrix, Vector, M>
 
             // Update model parameters using optimizer state
             self.state.update_weights(model)?;
+
+            // Call progress callback if provided
+            if let Some(callback) = self.progress_callback {
+                let perc = (i as f64 + 1.0 / self.epochs as f64) * 100.0;
+                callback(i + 1, perc, cost);
+            }
         }
         Ok(())
     }

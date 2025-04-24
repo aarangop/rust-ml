@@ -65,7 +65,7 @@ fn main() {
         .unwrap();
 
     // Create the optimizer
-    let mut gd: GD = GradientDescent::new(0.01, 2000);
+    let mut gd: GD = GradientDescent::new(0.01, 2000, None, None);
 
     // Create the profiler
     let profiler: ClassificationProfiler<LogisticRegression, GD, Matrix, Vector> =

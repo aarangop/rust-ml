@@ -73,7 +73,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut gd: GD = GradientDescent::new(0.01, 1000);
+    let mut gd: GD = GradientDescent::new(0.01, 1000, None, None);
 
     // Instantiate a profiler for linear regression and gradient descent.
     let profiler: RegressionProfiler<LinearRegression, GD, Matrix, Vector> =
